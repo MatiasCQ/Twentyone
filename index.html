@@ -340,7 +340,7 @@
     .saw-labels { display: flex; justify-content: space-between; font-size: 13px; }
     .saw-track {
       position: relative;
-      height: 14px; border-radius: 999px;
+            height: 14px; border-radius: 999px;
       background: rgba(255,255,255,0.07);
       overflow: visible;
     }
@@ -567,6 +567,11 @@ const TRUMP_LIBRARY = {
 ════════════════════════════════════════════ */
 const runtime = {
   renderQueued: false,
+  shellMounted: false,
+  screenKey: "",
+  modalKey: "",
+  topbarKey: "",
+  mountedPersistent: new Set(),
   turnInterval: null,
   turnDeadline: 0,
   turnActivePlayer: null,
@@ -577,7 +582,6 @@ const runtime = {
   roomConnection: null,
   heartbeatInterval: null,
   reconnectTimer: null,
-  roomListToken: 0,
   processedRemoteActions: new Set(),
   autoJoinAttempted: false,
 };
@@ -605,11 +609,8 @@ const state = {
     peerError: "",
     peerId: "",
     connectionStatus: "offline",
-    roomList: [],
     roomMeta: null,
     roomCodeInput: "",
-    discoveryError: "",
-    isRefreshing: false,
     localHash: "",
     remoteHash: "",
     syncWarning: "",
@@ -646,14 +647,6 @@ function getPeerOptions() {
   const c = state.online.peerConfig;
   return { host: c.host, port: c.port, path: normalizePath(c.path), secure: c.secure, debug: c.debug };
 }
-function getPeerHttpBase() {
-  const c = state.online.peerConfig;
-  const proto = c.secure ? "https" : "http";
-  const defaultPort = (c.secure && c.port===443) || (!c.secure && c.port===80);
-  const portPart = defaultPort ? "" : `:${c.port}`;
-  return `${proto}://${c.host}${portPart}${normalizePath(c.path)}`;
-}
-
 /* ════════════════════════════════════════════
    UTILS
 ════════════════════════════════════════════ */
@@ -666,6 +659,21 @@ function cloneSimple(v){ return JSON.parse(JSON.stringify(v)); }
 function esc(v){ return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function getRoomCodeFromUrl(){ return new URLSearchParams(window.location.search).get("room")||""; }
 function setRoomCodeInUrl(id){ const p=new URLSearchParams(window.location.search); id?p.set("room",id):p.delete("room"); history.replaceState({},"",`${window.location.pathname}${p.toString()?`?${p}`:""}`); }
+function parseRoomFields(value){
+  const raw=String(value||"").trim().toUpperCase();
+  if(!raw) return { roomCode:"", roomId:"" };
+  if(raw.startsWith("ROOM-")){
+    return { roomCode:raw.slice(5), roomId:`room-${raw.slice(5)}` };
+  }
+  return { roomCode:raw.replace(/^ROOM-/,""), roomId:`room-${raw.replace(/^ROOM-/,"")}` };
+}
+function withNormalizedRoomMeta(meta){
+  const copy=cloneSimple(meta||{});
+  const parsed=parseRoomFields(copy.roomCode||copy.roomId||"");
+  copy.roomCode=parsed.roomCode;
+  copy.roomId=parsed.roomId;
+  return copy;
+}
 
 /* ════════════════════════════════════════════
    GAME ENGINE
@@ -674,7 +682,7 @@ function createCard(game, value, ownerIndex, opts) {
   return {
     uid: `${game.roundNumber}-${ownerIndex}-${game.nextCardOrder}`,
     value, ownerIndex,
-    hiddenFromOpponent: !!opts.hiddenFromOpponent,
+        hiddenFromOpponent: !!opts.hiddenFromOpponent,
     source: opts.source||"draw",
     recentEligible: opts.recentEligible!==false,
     drawOrder: game.nextCardOrder++,
@@ -859,7 +867,7 @@ function startTurnFlow(){
       clearInterval(runtime.turnInterval); runtime.turnInterval=null;
       performLocalGameAction(buildAction("timeout",{playerIndex:state.game.activePlayer})); return;
     }
-    queueRender();
+    updateTimerUI();
   },250);
   if(state.game.players[state.game.activePlayer].control==="bot"){
     runtime.botTimer=window.setTimeout(()=>runBotTurn(),900);
@@ -946,7 +954,6 @@ function chooseBotAction(){
 async function openOnlineBrowser(){
   state.screen="online-browser"; queueRender();
   await ensurePeer("client");
-  await refreshRooms();
   if(state.online.roomCodeInput&&getRoomCodeFromUrl()){
     await joinRoom(state.online.roomCodeInput);
   }
@@ -994,60 +1001,30 @@ function attemptReconnect(){
   },Math.min(1000*state.online.reconnectAttempts,5000));
 }
 
-async function refreshRooms(){
-  if(!isPeerConfigReady()){ state.online.discoveryError="Configura el servidor PeerJS."; queueRender(); return; }
-  state.online.isRefreshing=true; state.online.discoveryError="";
-  const token=++runtime.roomListToken; queueRender();
-  try {
-    await ensurePeer("client");
-    const resp=await fetch(`${getPeerHttpBase()}/peers`,{mode:"cors",credentials:"omit"});
-    if(!resp.ok) throw new Error(`Discovery falló con estado ${resp.status}.`);
-    const peerIds=await resp.json();
-    const roomIds=peerIds.filter(id=>id.startsWith("room-")&&id!==state.online.peerId);
-    const metas=await Promise.all(roomIds.map(id=>requestRoomMeta(id)));
-    if(token!==runtime.roomListToken) return;
-    state.online.roomList=metas.filter(Boolean).filter(r=>r.visibility==="public"&&r.players<2&&r.version===APP_VERSION).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-  } catch(err){ state.online.discoveryError=String(err&&err.message?err.message:err); }
-  finally { state.online.isRefreshing=false; queueRender(); }
-}
-
-function requestRoomMeta(roomId){
-  return new Promise(resolve=>{
-    if(!runtime.peer){ resolve(null); return; }
-    const conn=runtime.peer.connect(roomId,{reliable:true,metadata:{type:"meta-request",requester:state.online.peerId}});
-    let settled=false;
-    const finish=v=>{ if(settled) return; settled=true; try{conn.close();}catch(e){} resolve(v); };
-    conn.on("open",()=>conn.send({type:"hello",request:"room-meta",version:APP_VERSION}));
-    conn.on("data",msg=>{ if(msg.type==="room-meta") finish(msg.room); });
-    conn.on("error",()=>finish(null)); conn.on("close",()=>finish(null));
-    window.setTimeout(()=>finish(null),2000);
-  });
-}
-
 async function createRoomFromModal(){
   const roomName=(document.getElementById("cr-name")||{}).value||"";
   const playerName=(document.getElementById("cr-player")||{}).value||"";
-  const visibility=(document.getElementById("cr-vis")||{}).value||"public";
   const safePlayer=String(playerName).trim()||state.menu.onlineName||"Host";
   const safeRoom=String(roomName).trim()||`Mesa de ${safePlayer}`;
-  const roomId=randomCode("room");
+  const roomCode=randomCode("");
+  const roomId=`room-${roomCode}`;
   localStorage.setItem("to.onlineName",safePlayer);
   state.menu.onlineName=safePlayer;
   await ensurePeer("room",roomId);
   state.online.role="host"; state.online.connectionStatus="hosting";
-  state.online.roomMeta={roomId,roomName:safeRoom,hostPeerId:roomId,hostName:safePlayer,guestName:"",visibility,players:1,status:"lobby",createdAt:new Date().toISOString(),version:APP_VERSION};
-  state.online.roomCodeInput=roomId;
+  state.online.roomMeta={roomId,roomCode,roomName:safeRoom,hostPeerId:roomId,hostName:safePlayer,guestName:"",players:1,status:"lobby",createdAt:new Date().toISOString(),version:APP_VERSION};
+  state.online.roomCodeInput=roomCode;
   state.ui.modal=null; state.screen="online-lobby"; state.online.syncWarning="";
-  setRoomCodeInUrl(roomId); queueRender();
+  setRoomCodeInUrl(roomCode); queueRender();
 }
 
 async function joinRoom(roomId,isReconnect){
-  const safe=String(roomId||"").trim().toUpperCase();
-  if(!safe) return;
+  const parsed=parseRoomFields(roomId||state.online.roomCodeInput);
+  if(!parsed.roomId) return;
   await ensurePeer("client");
   state.online.connectionStatus=isReconnect?"reconnecting":"joining";
   state.online.syncWarning=""; queueRender();
-  const conn=runtime.peer.connect(safe,{reliable:true,metadata:{type:"join-request",requester:state.online.peerId}});
+    const conn=runtime.peer.connect(parsed.roomId,{reliable:true,metadata:{type:"join-request",requester:state.online.peerId}});
   wireConnection(conn);
   return new Promise((resolve,reject)=>{
     let settled=false;
@@ -1057,9 +1034,10 @@ async function joinRoom(roomId,isReconnect){
     conn.on("data",msg=>{
       if(msg.type==="join-accept"){
         runtime.roomConnection=conn; state.online.role="guest"; state.online.connectionStatus="connected";
-        state.online.roomMeta=msg.room; state.online.reconnectAttempts=0;
+        state.online.roomMeta=withNormalizedRoomMeta(msg.room); state.online.reconnectAttempts=0;
+        state.online.roomCodeInput=state.online.roomMeta.roomCode;
         state.screen=msg.room.status==="playing"?"game":"online-lobby";
-        state.ui.modal=null; setRoomCodeInUrl(msg.room.roomId); startHeartbeat(); queueRender(); res(msg);
+        state.ui.modal=null; setRoomCodeInUrl(state.online.roomMeta.roomCode); startHeartbeat(); queueRender(); res(msg);
       } else if(msg.type==="join-reject"){
         state.online.connectionStatus="rejected"; state.online.syncWarning=msg.reason||"No se pudo entrar a la sala.";
         try{conn.close();}catch(e){} queueRender(); rej(new Error(msg.reason||"Join rejected"));
@@ -1089,7 +1067,7 @@ function handleRoomMessage(msg,conn){
   if(msg.type==="start-game"){ state.game=cloneSimple(msg.game); state.screen="game"; state.online.localHash=computeGameHash(state.game); state.online.remoteHash=""; state.online.syncWarning=""; startTurnFlow(); queueRender(); return; }
   if(msg.type==="action"){ applyRemoteGameAction(msg); return; }
   if(msg.type==="state-hash"){ state.online.remoteHash=msg.hash; if(msg.mismatch&&state.online.role==="host") sendSnapshot("guest-mismatch"); queueRender(); return; }
-  if(msg.type==="snapshot"){ state.game=cloneSimple(msg.game); state.online.roomMeta=cloneSimple(msg.room); state.online.localHash=computeGameHash(state.game); state.online.syncWarning="Snapshot aplicado para resincronizar."; startTurnFlow(); queueRender(); return; }
+  if(msg.type==="snapshot"){ state.game=cloneSimple(msg.game); state.online.roomMeta=withNormalizedRoomMeta(msg.room); state.online.localHash=computeGameHash(state.game); state.online.syncWarning="Snapshot aplicado para resincronizar."; startTurnFlow(); queueRender(); return; }
   if(msg.type==="heartbeat"){ state.online.connectionStatus="synced"; queueRender(); return; }
   if(msg.type==="leave"){
     state.online.syncWarning="El otro jugador abandonó la sala.";
@@ -1136,9 +1114,9 @@ function leaveToMenu(){
 }
 
 function copyRoomCode(){
-  const id=state.online.roomMeta&&state.online.roomMeta.roomId;
-  if(!id||!navigator.clipboard) return;
-  const url=`${window.location.origin}${window.location.pathname}?room=${id}`;
+  const code=state.online.roomMeta&&state.online.roomMeta.roomCode;
+  if(!code||!navigator.clipboard) return;
+  const url=`${window.location.origin}${window.location.pathname}?room=${code}`;
   navigator.clipboard.writeText(url).then(()=>{showNotice("Enlace copiado al portapapeles.",false);}).catch(()=>showNotice("No se pudo copiar el enlace.",true));
 }
 function showNotice(msg,isErr){
@@ -1173,17 +1151,13 @@ root.addEventListener("click", e=>{
       startTurnFlow(); queueRender(); break;
     case "open-online": safeAsync(openOnlineBrowser); break;
     case "back-menu":   leaveToMenu(); break;
-    case "refresh-rooms": safeAsync(refreshRooms); break;
     case "open-create-room": state.ui.modal="create-room"; queueRender(); break;
     case "close-modal": state.ui.modal=null; queueRender(); break;
-    case "save-peer-config": submitPeerConfig(); break;
-    case "join-room": safeAsync(()=>joinRoom(ds.roomId)); break;
     case "join-by-code": safeAsync(()=>joinRoom(state.online.roomCodeInput)); break;
     case "create-room-submit": safeAsync(createRoomFromModal); break;
     case "leave-room": leaveRoomToBrowser(); break;
     case "start-online-match": startHostedOnlineGame(); break;
     case "copy-room-code": copyRoomCode(); break;
-    case "open-peer-config": state.ui.modal="peer-config"; queueRender(); break;
     case "draw-card":
     case "stay":
     case "use-trump":
@@ -1198,7 +1172,7 @@ root.addEventListener("input", e=>{
   if(!(t instanceof HTMLInputElement||t instanceof HTMLTextAreaElement||t instanceof HTMLSelectElement)) return;
   if(t.id==="m-player-name"){ state.menu.playerName=t.value; }
   else if(t.id==="m-online-name"){ state.menu.onlineName=t.value; localStorage.setItem("to.onlineName",t.value); }
-  else if(t.id==="join-code"){ state.online.roomCodeInput=t.value.toUpperCase(); }
+  else if(t.id==="join-code"){ state.online.roomCodeInput=parseRoomFields(t.value).roomCode; }
 });
 window.addEventListener("beforeunload",()=>{ sendRoomMessage({type:"leave",reason:"window-close"}); cleanupOnlineRuntime(true); });
 
@@ -1210,29 +1184,160 @@ function handleGameButton(action,ds){
   else if(action==="use-trump") performLocalGameAction(buildAction("play-trump",{playerIndex:pi,trumpIndex:Number(ds.trumpIndex)}));
   else if(action==="next-round") performLocalGameAction(buildAction("next-round",{seed:generateSeed("round")}));
 }
-function submitPeerConfig(){
-  savePeerConfig({
-    host:(document.getElementById("pc-host")||{}).value||DEFAULT_PEER_HOST,
-    port:(document.getElementById("pc-port")||{}).value||DEFAULT_PEER_PORT,
-    path:(document.getElementById("pc-path")||{}).value||DEFAULT_PEER_PATH,
-    secure:((document.getElementById("pc-secure")||{}).value||"true")==="true",
-  });
-  state.ui.modal=null; cleanupOnlineRuntime(false); queueRender();
-}
 function safeAsync(task){ Promise.resolve().then(task).catch(err=>showNotice(String(err&&err.message?err.message:err),true)); }
 function queueRender(){ if(runtime.renderQueued) return; runtime.renderQueued=true; window.requestAnimationFrame(()=>{ runtime.renderQueued=false; render(); }); }
 
 /* ════════════════════════════════════════════
    RENDER
 ════════════════════════════════════════════ */
-function render(){ root.innerHTML=renderApp(); }
-
-function renderApp(){
-  return `<div id="shell">
-    ${renderTopbar()}
-    ${renderScreen()}
-    ${renderModal()}
+function getTopbarKey(){
+  const rm=state.online.roomMeta;
+  return [
+    state.screen,
+    state.online.connectionStatus,
+    state.online.peerStatus,
+    state.online.peerId,
+    rm?`${rm.roomName}|${rm.players}`:"-",
+  ].join("::");
+}
+function getScreenKey(){
+  if(state.screen==="game"){
+    const game=state.game;
+    return [
+      state.screen,
+      game?game.actionSeq:"nogame",
+      game?game.phase:"-",
+      game?game.activePlayer:"-",
+      game&&game.result?JSON.stringify(game.result):"-",
+      state.online.connectionStatus,
+      state.online.syncWarning,
+      state.ui.notice,
+      state.ui.noticeIsError?"1":"0",
+    ].join("::");
+  }
+  if(state.screen==="online-browser"){
+    return [
+      state.screen,
+      state.online.peerStatus,
+      state.online.peerId,
+      state.online.peerError,
+      state.online.roomCodeInput,
+      state.ui.notice,
+      state.ui.noticeIsError?"1":"0",
+    ].join("::");
+  }
+  if(state.screen==="online-lobby"){
+    return [
+      state.screen,
+      state.online.connectionStatus,
+      state.online.syncWarning,
+      state.online.role,
+      state.ui.notice,
+      state.ui.noticeIsError?"1":"0",
+      JSON.stringify(state.online.roomMeta),
+    ].join("::");
+  }
+  return [
+    state.screen,
+    state.menu.playerName,
+    state.menu.onlineName,
+    state.ui.notice,
+    state.ui.noticeIsError?"1":"0",
+  ].join("::");
+}
+function ensureShell(){
+  if(runtime.shellMounted) return;
+  root.innerHTML=`<div id="shell">
+    <div id="topbar-root"></div>
+    <main id="screen-root"></main>
+    <div id="modal-root"></div>
   </div>`;
+  runtime.shellMounted=true;
+}
+function render(){
+  ensureShell();
+  const nextTopbarKey=getTopbarKey();
+  const nextScreenKey=getScreenKey();
+  const nextModalKey=state.ui.modal||"";
+  if(runtime.topbarKey!==nextTopbarKey){
+    const topbarRoot=document.getElementById("topbar-root");
+    if(topbarRoot) topbarRoot.innerHTML=renderTopbar();
+    runtime.topbarKey=nextTopbarKey;
+  }
+  if(runtime.screenKey!==nextScreenKey){
+    const screenRoot=document.getElementById("screen-root");
+    if(screenRoot) screenRoot.innerHTML=renderScreen();
+    runtime.screenKey=nextScreenKey;
+  }
+  if(runtime.modalKey!==nextModalKey){
+    const modalRoot=document.getElementById("modal-root");
+    if(modalRoot) modalRoot.innerHTML=renderModal();
+    runtime.modalKey=nextModalKey;
+  }
+  updateTimerUI();
+  updateConnectionUI();
+  updateLogUI();
+  updateDynamicLabels();
+}
+function onceAnimateClass(key){
+  if(runtime.mountedPersistent.has(key)) return "";
+  runtime.mountedPersistent.add(key);
+  return " animate-in";
+}
+function updateTimerUI(){
+  if(!state.game||state.screen!=="game"||state.game.phase!=="playing") return;
+  const left=getTimeLeftMs();
+  const pct=Math.max(0,Math.min(100,(left/TURN_TIME_MS)*100));
+  const secs=Math.ceil(left/1000);
+  const fill=document.querySelector('[data-ui="timer-fill"]');
+  const label=document.querySelector('[data-ui="timer-label"]');
+  if(fill) fill.style.width=`${pct}%`;
+  if(label) label.textContent=`${secs}s`;
+}
+function updateConnectionUI(){
+  const pill=document.querySelector('[data-ui="topbar-online-pill"]');
+  if(pill){
+    const rm=state.online.roomMeta;
+    const connLabel=state.online.connectionStatus;
+    const isOnline=(connLabel==="connected"||connLabel==="synced"||connLabel==="hosting");
+    const onlineInfo=rm?`${rm.roomName} — ${rm.players}/2`
+      :state.online.peerStatus==="open"?`Peer: ${state.online.peerId}`
+      :"Sin conexión";
+    pill.className=`pill ${isOnline?"pill-ok":"pill-warn"}`;
+    pill.textContent=onlineInfo;
+  }
+  const gameConn=document.querySelector('[data-ui="game-conn-pill"]');
+  if(gameConn){
+    const ok=state.online.connectionStatus==="synced"||state.online.connectionStatus==="connected";
+    gameConn.className=`pill ${ok?"pill-ok":"pill-warn"}`;
+    gameConn.textContent=state.online.connectionStatus;
+  }
+}
+function updateLogUI(){
+  if(!state.game||state.screen!=="game") return;
+  const logRoot=document.querySelector('[data-ui="log-scroll"]');
+  if(!logRoot) return;
+  logRoot.innerHTML=state.game.log.length
+    ? state.game.log.map(e=>`<div class="log-entry">${esc(e)}</div>`).join("")
+    : `<div class="muted" style="font-style:italic;padding:10px">El registro aparecerá aquí.</div>`;
+}
+function updateDynamicLabels(){
+  if(!state.game||state.screen!=="game") return;
+  const li=state.game.mode==="online"?getOnlineLocalPlayerIndex():getViewerIndex();
+  const prompt=document.querySelector('[data-ui="turn-label"]');
+  if(prompt){
+    prompt.textContent=isLocalTurn()
+      ?"Tu turno: usa un trump, roba o plántate."
+      :"Esperando la jugada del rival...";
+  }
+  document.querySelectorAll('[data-action="draw-card"],[data-action="stay"],[data-action="use-trump"]').forEach(el=>{
+    if(!(el instanceof HTMLButtonElement)) return;
+    el.disabled=!isLocalTurn();
+  });
+  const actionEyebrow=document.querySelector('[data-ui="action-player"]');
+  if(actionEyebrow&&state.game.players[li]){
+    actionEyebrow.textContent=`Acciones — ${state.game.players[li].name}`;
+  }
 }
 
 function renderTopbar(){
@@ -1251,7 +1356,7 @@ function renderTopbar(){
       </div>
     </div>
     <div class="nav-actions">
-      ${state.screen!=="menu"?`<span class="pill ${isOnline?"pill-ok":"pill-warn"}">${esc(onlineInfo)}</span>`:""}
+      ${state.screen!=="menu"?`<span class="pill ${isOnline?"pill-ok":"pill-warn"}" data-ui="topbar-online-pill">${esc(onlineInfo)}</span>`:""}
       ${state.screen!=="menu"?`<button class="btn-ghost" data-action="back-menu">← Menú</button>`:""}
     </div>
   </header>`;
@@ -1261,7 +1366,7 @@ function renderScreen(){
   switch(state.screen){
     case "online-browser": return renderBrowser();
     case "online-lobby":   return renderLobby();
-    case "game":           return renderGame();
+          case "game":           return renderGame();
     default:               return renderMenu();
   }
 }
@@ -1296,10 +1401,9 @@ function renderMenu(){
         <div class="mode-card-icon online">🌐</div>
         <div class="eyebrow">Online P2P</div>
         <h3>Multijugador Online</h3>
-        <p>Crea una sala o únete por código. Conexión directa entre navegadores vía PeerJS, sin servidor central para la partida.</p>
+        <p>Crea una sala, comparte el código y juega por conexión directa P2P vía PeerJS.</p>
         <footer>
           <button class="btn" data-action="open-online">Abrir lobby</button>
-          <button class="btn-ghost" data-action="open-peer-config">⚙ Servidor</button>
         </footer>
       </article>
     </div>
@@ -1309,36 +1413,20 @@ function renderMenu(){
 
 /* ── BROWSER ── */
 function renderBrowser(){
-  const rooms=state.online.roomList;
-  const roomHTML=rooms.length
-    ? rooms.map(r=>`<article class="room-card">
-        <div class="eyebrow">${esc(r.visibility==="public"?"Pública":"Privada")}</div>
-        <h3>${esc(r.roomName)}</h3>
-        <p>Host: <strong>${esc(r.hostName)}</strong></p>
-        <div class="chip-row">
-          <span class="chip chip-gold">${esc(r.roomId)}</span>
-          <span class="chip">${r.players}/2 jugadores</span>
-          <span class="chip">${esc(r.status==="lobby"?"En lobby":"Jugando")}</span>
-        </div>
-        <button class="btn" style="margin-top:4px" data-action="join-room" data-room-id="${esc(r.roomId)}">Unirse</button>
-      </article>`).join("")
-    : `<div class="empty-state">No hay salas públicas disponibles en este momento.</div>`;
-
   const statusClass=state.online.peerStatus==="open"?"pill-ok":"pill-warn";
-  return `<section class="panel browser animate-in">
+  return `<section class="panel browser${onceAnimateClass("browser")}">
     <div class="section-head">
       <div class="eyebrow">Multijugador Online</div>
-      <h2>Lobby de Salas</h2>
-      <p class="muted">Crea una sala o únete con un código. La conexión es P2P directa.</p>
+      <h2>Crear o unirse por código</h2>
+      <p class="muted">Crea una sala, comparte el código para invitar y tu rival se une con ese código.</p>
     </div>
     <div class="browser-top">
       <div class="info-card">
-        <div class="eyebrow">Servidor PeerJS</div>
-        <h3>${esc(state.online.peerConfig.host)}</h3>
-        <p>Puerto ${esc(String(state.online.peerConfig.port))} · Path ${esc(state.online.peerConfig.path)}</p>
+        <div class="eyebrow">Conexión PeerJS</div>
+        <h3>Estado del cliente</h3>
+        <p>La partida usa PeerJS por defecto para conexión P2P directa.</p>
         <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
           <span class="pill ${statusClass}">${esc(state.online.peerStatus)}</span>
-          <button class="btn-sm" data-action="open-peer-config">Editar</button>
         </div>
       </div>
       <div class="info-card">
@@ -1346,19 +1434,14 @@ function renderBrowser(){
         <h3>Unirse por código</h3>
         <div class="field">
           <label for="join-code">Código de sala</label>
-          <input id="join-code" value="${esc(state.online.roomCodeInput)}" placeholder="ROOM-ABC123" style="text-transform:uppercase" />
+          <input id="join-code" value="${esc(state.online.roomCodeInput)}" placeholder="ABC123" style="text-transform:uppercase" />
         </div>
         <button class="btn" style="margin-top:6px" data-action="join-by-code">Unirse</button>
       </div>
     </div>
-    ${state.online.discoveryError?`<div class="err-bar">${esc(state.online.discoveryError)}</div>`:""}
+    ${state.online.peerError?`<div class="err-bar">${esc(state.online.peerError)}</div>`:""}
     ${state.ui.notice?`<div class="${state.ui.noticeIsError?"err-bar":"notice-bar"}">${esc(state.ui.notice)}</div>`:""}
-    <div class="section-head">
-      <div class="eyebrow">Salas disponibles</div>
-    </div>
-    <div class="room-list">${roomHTML}</div>
     <div class="browser-footer">
-      <button class="btn-ghost" data-action="refresh-rooms">${state.online.isRefreshing?"⟳ Cargando...":"⟳ Actualizar salas"}</button>
       <button class="btn" data-action="open-create-room">+ Crear sala</button>
       <span class="spacer"></span>
       <span class="muted" style="font-size:13px">Peer: ${esc(state.online.peerId||"—")}</span>
@@ -1371,11 +1454,11 @@ function renderLobby(){
   const rm=state.online.roomMeta;
   if(!rm) return renderBrowser();
   const statusClass=state.online.connectionStatus==="connected"||state.online.connectionStatus==="synced"?"pill-ok":"pill-warn";
-  return `<section class="panel lobby animate-in">
+  return `<section class="panel lobby${onceAnimateClass("lobby")}">
     <div class="section-head">
       <div class="eyebrow">Sala activa</div>
       <h2>${esc(rm.roomName)}</h2>
-      <p class="muted">Código: <strong style="color:var(--gold)">${esc(rm.roomId)}</strong> · ${esc(rm.visibility==="public"?"Pública":"Privada")} · ${rm.players}/2 jugadores</p>
+      <p class="muted">Código: <strong style="color:var(--gold)">${esc(rm.roomCode||parseRoomFields(rm.roomId).roomCode)}</strong> · Compártelo para invitar · ${rm.players}/2 jugadores</p>
     </div>
     <div class="lobby-grid">
       <div>
@@ -1416,8 +1499,8 @@ function renderGame(){
   if(!state.game) return renderMenu();
   const game=state.game, vi=getViewerIndex(), li=game.mode==="online"?getOnlineLocalPlayerIndex():vi;
   const topIndex=otherPlayer(vi), botIndex=vi;
-  const target=getCurrentTarget(game), timerLeft=getTimeLeftMs(), timerPct=(timerLeft/TURN_TIME_MS)*100;
-  return `<section class="panel game-shell animate-in">
+  const target=getCurrentTarget(game), timerPct=(getTimeLeftMs()/TURN_TIME_MS)*100;
+  return `<section class="panel game-shell${onceAnimateClass("game-shell")}">
     <div class="game-board">
       <div class="table-col">
         ${renderPlayerPanel(topIndex,vi,"rival")}
@@ -1425,8 +1508,8 @@ function renderGame(){
         ${renderPlayerPanel(botIndex,vi,"tú")}
         <div class="action-zone">
           <div>
-            <div class="eyebrow">Acciones — ${esc(game.players[li].name)}</div>
-            <p class="muted" style="font-size:14px;margin-top:4px">${isLocalTurn()?"Tu turno: usa un trump, roba o plántate.":"Esperando la jugada del rival..."}</p>
+            <div class="eyebrow" data-ui="action-player">Acciones — ${esc(game.players[li].name)}</div>
+            <p class="muted" data-ui="turn-label" style="font-size:14px;margin-top:4px">${isLocalTurn()?"Tu turno: usa un trump, roba o plántate.":"Esperando la jugada del rival..."}</p>
           </div>
           <div class="action-buttons">
             <button class="btn" data-action="draw-card" ${!isLocalTurn()?"disabled":""}>🎴 Robar carta</button>
@@ -1437,13 +1520,13 @@ function renderGame(){
       </div>
       <aside class="log-panel">
         <div class="eyebrow" style="margin-bottom:8px">Registro de jugadas</div>
-        <div class="log-scroll">
+        <div class="log-scroll" data-ui="log-scroll">
           ${game.log.length
             ? game.log.map(e=>`<div class="log-entry">${esc(e)}</div>`).join("")
             : `<div class="muted" style="font-style:italic;padding:10px">El registro aparecerá aquí.</div>`}
         </div>
         ${game.mode==="online"?`<div style="margin-top:12px">
-          <span class="pill ${state.online.connectionStatus==="synced"||state.online.connectionStatus==="connected"?"pill-ok":"pill-warn"}">${esc(state.online.connectionStatus)}</span>
+          <span class="pill ${state.online.connectionStatus==="synced"||state.online.connectionStatus==="connected"?"pill-ok":"pill-warn"}" data-ui="game-conn-pill">${esc(state.online.connectionStatus)}</span>
           ${state.online.syncWarning?`<div class="notice-bar" style="margin-top:8px;font-size:13px">${esc(state.online.syncWarning)}</div>`:""}
         </div>`:""}
       </aside>
@@ -1544,8 +1627,8 @@ function renderCenterPanel(target,timerPct){
       <div class="metric"><div class="metric-lbl">Mazo</div><div class="metric-val">${game.deck.length}</div></div>
     </div>
     <div>
-      <div class="eyebrow" style="margin-bottom:5px">Tiempo restante</div>
-      <div class="timer-bar"><div class="timer-fill" style="width:${timerPct}%"></div></div>
+      <div class="eyebrow" style="margin-bottom:5px">Tiempo restante <span data-ui="timer-label">${Math.ceil(getTimeLeftMs()/1000)}s</span></div>
+      <div class="timer-bar"><div class="timer-fill" data-ui="timer-fill" style="width:${timerPct}%"></div></div>
     </div>
   </div>`;
 }
@@ -1588,50 +1671,9 @@ function renderModal(){
           <label for="cr-player">Tu nombre</label>
           <input id="cr-player" value="${esc(state.menu.onlineName)}" />
         </div>
-        <div class="field">
-          <label for="cr-vis">Visibilidad</label>
-          <select id="cr-vis">
-            <option value="public">Pública (aparece en el lobby)</option>
-            <option value="private">Privada (solo por código)</option>
-          </select>
-        </div>
+        <p class="muted" style="font-size:14px">Esta sala se comparte únicamente por código de invitación.</p>
         <div class="modal-actions">
           <button class="btn" data-action="create-room-submit">Crear sala</button>
-          <button class="btn-ghost" data-action="close-modal">Cancelar</button>
-        </div>
-      </article>
-    </div>`;
-  }
-  if(state.ui.modal==="peer-config"){
-    const c=state.online.peerConfig;
-    return `<div class="modal-bg">
-      <article class="modal-card animate-in">
-        <div class="eyebrow">Configuración del servidor</div>
-        <h3>PeerJS Server</h3>
-        <p class="muted" style="font-size:14px">Por defecto se usa el servidor público gratuito de PeerJS (0.peerjs.com). Solo cambia esto si tienes tu propio servidor.</p>
-        <div class="field">
-          <label for="pc-host">Host</label>
-          <input id="pc-host" value="${esc(c.host)}" placeholder="0.peerjs.com" />
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="pc-port">Puerto</label>
-            <input id="pc-port" value="${esc(String(c.port))}" placeholder="443" />
-          </div>
-          <div class="field">
-            <label for="pc-path">Path</label>
-            <input id="pc-path" value="${esc(c.path)}" placeholder="/" />
-          </div>
-          <div class="field">
-            <label for="pc-secure">Seguro (HTTPS)</label>
-            <select id="pc-secure">
-              <option value="true" ${c.secure?"selected":""}>Sí (HTTPS)</option>
-              <option value="false" ${!c.secure?"selected":""}>No (HTTP)</option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn" data-action="save-peer-config">Guardar</button>
           <button class="btn-ghost" data-action="close-modal">Cancelar</button>
         </div>
       </article>
@@ -1644,9 +1686,10 @@ function renderModal(){
    BOOT
 ════════════════════════════════════════════ */
 (function boot(){
-  state.online.roomCodeInput=getRoomCodeFromUrl()||"";
+  const urlRoom=getRoomCodeFromUrl()||"";
+  state.online.roomCodeInput=parseRoomFields(urlRoom).roomCode;
   render();
-  if(state.online.roomCodeInput){
+  if(urlRoom){
     state.screen="online-browser"; render();
     queueMicrotask(()=>{
       if(!runtime.autoJoinAttempted){
