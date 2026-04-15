@@ -1,0 +1,1663 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Twenty One — Mesa de Cartas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0a0c0f;
+      --felt:      #0d1a14;
+      --felt2:     #111f18;
+      --panel:     rgba(14,18,24,0.92);
+      --panel2:    rgba(20,26,34,0.85);
+      --glass:     rgba(255,255,255,0.04);
+      --border:    rgba(255,255,255,0.08);
+      --border2:   rgba(212,175,95,0.2);
+      --gold:      #d4af5f;
+      --gold2:     #f0d080;
+      --gold-dim:  #8a6e30;
+      --red:       #c0392b;
+      --red2:      #e74c3c;
+      --green:     #27ae60;
+      --green2:    #2ecc71;
+      --text:      #e8dcc8;
+      --text2:     #a09070;
+      --text3:     #5a5040;
+      --shadow:    0 32px 80px rgba(0,0,0,0.7);
+      --r:         20px;
+      --r-sm:      12px;
+      --font-head: 'Cinzel', serif;
+      --font-body: 'Crimson Pro', serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 17px;
+    }
+    body {
+      background:
+        radial-gradient(ellipse 80% 40% at 50% 0%, rgba(212,175,95,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 60% at 80% 100%, rgba(27,70,42,0.15) 0%, transparent 50%),
+        linear-gradient(180deg, #0a0c0f 0%, #0d1017 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    button, input, select { font-family: var(--font-body); font-size: inherit; }
+    button { cursor: pointer; border: none; }
+    a { color: inherit; }
+
+    /* ── LAYOUT ────────────────────────── */
+    #app { max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+
+    /* ── PANELS ────────────────────────── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+    .glass {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+    }
+    .gold-border { border-color: var(--border2); }
+
+    /* ── TYPOGRAPHY ────────────────────── */
+    .eyebrow {
+      font-family: var(--font-head);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold-dim);
+    }
+    h1,h2,h3 { font-family: var(--font-head); font-weight: 700; line-height: 1.1; }
+    h1 { font-size: clamp(28px,4vw,46px); color: var(--gold); }
+    h2 { font-size: clamp(20px,3vw,30px); }
+    h3 { font-size: 18px; }
+    .muted { color: var(--text2); }
+    .dim   { color: var(--text3); }
+
+    /* ── BUTTONS ───────────────────────── */
+    .btn, .btn-ghost, .btn-danger, .btn-sm {
+      padding: 11px 22px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.03em;
+      transition: transform 0.12s, opacity 0.12s, box-shadow 0.12s;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn {
+      background: linear-gradient(135deg, var(--gold), #b8922a);
+      color: #0a0800;
+      box-shadow: 0 4px 20px rgba(212,175,95,0.3);
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(212,175,95,0.45); }
+    .btn-ghost {
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
+    .btn-danger {
+      background: linear-gradient(135deg, #e74c3c, #922b21);
+      color: white;
+    }
+    .btn-danger:hover { transform: translateY(-1px); }
+    .btn-sm {
+      padding: 7px 16px;
+      font-size: 13px;
+      background: rgba(255,255,255,0.07);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-sm:hover { background: rgba(255,255,255,0.12); }
+    button:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+
+    /* ── INPUTS ────────────────────────── */
+    input, select {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--border2); }
+    select option { background: #1a1a1a; }
+    label { font-size: 13px; color: var(--text2); margin-bottom: 4px; display: block; }
+    .field { display: grid; gap: 6px; }
+    .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 14px; }
+
+    /* ── TOPBAR ────────────────────────── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; padding: 18px 28px;
+      border-bottom: 1px solid var(--border);
+      border-radius: var(--r);
+    }
+    .brand-line { display: flex; align-items: center; gap: 16px; }
+    .brand-icon {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, var(--gold), #8a6020);
+      border-radius: 12px;
+      display: grid; place-items: center;
+      font-family: var(--font-head); font-size: 22px; color: #0a0800; font-weight: 900;
+      flex-shrink: 0;
+    }
+    .nav-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .pill {
+      padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+      font-family: var(--font-head); letter-spacing: 0.04em;
+    }
+    .pill-ok   { background: rgba(39,174,96,0.15); color: #6ee8a0; border: 1px solid rgba(39,174,96,0.3); }
+    .pill-warn { background: rgba(212,175,95,0.12); color: var(--gold); border: 1px solid rgba(212,175,95,0.25); }
+    .pill-err  { background: rgba(192,57,43,0.15); color: #f1948a; border: 1px solid rgba(192,57,43,0.3); }
+
+    /* ── HERO / MENU ───────────────────── */
+    .hero { padding: 36px 32px; display: grid; gap: 32px; }
+    .hero-copy { max-width: 700px; display: grid; gap: 10px; }
+    .hero-copy p { color: var(--text2); font-size: 17px; line-height: 1.6; }
+    .mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 16px; }
+    .mode-card {
+      background: linear-gradient(160deg, rgba(255,255,255,0.04), rgba(0,0,0,0.2));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+      display: grid; gap: 14px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .mode-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+    .mode-card-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: grid; place-items: center;
+      font-size: 22px;
+    }
+    .mode-card-icon.bot    { background: rgba(46,204,113,0.12); }
+    .mode-card-icon.online { background: rgba(212,175,95,0.12); }
+    .mode-card p { color: var(--text2); font-size: 15px; line-height: 1.5; }
+    .mode-card footer { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+    .mode-card h3 { font-size: 20px; }
+
+    /* ── BROWSER ───────────────────────── */
+    .browser { padding: 28px; display: grid; gap: 22px; }
+    .browser-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 16px; }
+    .info-card {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      display: grid; gap: 10px;
+    }
+    .info-card h3 { font-size: 16px; color: var(--gold); }
+    .info-card p { color: var(--text2); font-size: 14px; }
+    .room-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 14px; }
+    .room-card {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      display: grid; gap: 12px;
+      transition: border-color 0.2s;
+    }
+    .room-card:hover { border-color: var(--border2); }
+    .room-card h3 { font-size: 17px; }
+    .room-card p  { color: var(--text2); font-size: 14px; }
+    .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      padding: 4px 10px; border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      font-size: 12px; color: var(--text2);
+      font-family: var(--font-head); letter-spacing: 0.04em;
+    }
+    .chip-gold { background: rgba(212,175,95,0.12); color: var(--gold); }
+    .browser-footer { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+    .empty-state {
+      text-align: center; padding: 40px 20px; color: var(--text2);
+      border: 1px dashed rgba(255,255,255,0.1); border-radius: 16px;
+      font-style: italic; font-size: 16px;
+    }
+
+    /* ── LOBBY ─────────────────────────── */
+    .lobby { padding: 28px; display: grid; gap: 22px; }
+    .lobby-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .slot-card {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      display: grid; gap: 8px;
+    }
+    .slot-card.filled { border-color: rgba(39,174,96,0.3); }
+    .slot-card h3 { font-size: 18px; }
+    .lobby-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* ── GAME SCREEN ───────────────────── */
+    .game-shell { padding: 20px; display: grid; gap: 18px; }
+    .game-board { display: grid; grid-template-columns: 1fr 300px; gap: 18px; }
+    .table-col { display: grid; gap: 16px; }
+
+    /* ── PLAYER PANEL ──────────────────── */
+    .player-panel {
+      background: linear-gradient(160deg, rgba(255,255,255,0.03), rgba(0,0,0,0.2));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      display: grid; gap: 14px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .player-panel.active {
+      border-color: rgba(212,175,95,0.4);
+      box-shadow: 0 0 40px rgba(212,175,95,0.08), inset 0 0 0 1px rgba(212,175,95,0.15);
+    }
+    .player-panel.waiting { opacity: 0.7; }
+    .player-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .player-info { display: grid; gap: 4px; }
+    .player-info h3 { font-size: 20px; }
+    .player-stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .stat-tag {
+      padding: 4px 10px; border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      font-size: 12px; color: var(--text2);
+    }
+    .stat-tag.danger { background: rgba(192,57,43,0.15); color: #f1948a; }
+    .player-total {
+      font-family: var(--font-head);
+      font-size: 38px;
+      font-weight: 900;
+      color: var(--gold);
+      text-shadow: 0 0 30px rgba(212,175,95,0.4);
+      line-height: 1;
+    }
+    .player-total.over { color: var(--red2); text-shadow: 0 0 20px rgba(231,76,60,0.4); }
+
+    /* ── CARDS ─────────────────────────── */
+    .hand-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .card-el {
+      width: 80px;
+      min-height: 118px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: linear-gradient(160deg, #1c2030, #0f1218);
+      padding: 10px;
+      display: grid;
+      align-content: space-between;
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+      flex-shrink: 0;
+    }
+    .card-el:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.5); }
+    .card-el.hidden-card {
+      background: linear-gradient(160deg, #1a1428, #0e0c18);
+      border-color: rgba(150,100,200,0.2);
+    }
+    .card-el.busted-card { border-color: rgba(192,57,43,0.4); }
+    .card-corner-top { font-size: 11px; color: var(--text2); font-family: var(--font-head); letter-spacing: 0.05em; }
+    .card-value {
+      font-family: var(--font-head);
+      font-size: 34px;
+      font-weight: 900;
+      color: var(--text);
+      text-align: center;
+      line-height: 1;
+    }
+    .card-value.hidden-val { color: rgba(150,100,200,0.7); font-size: 28px; }
+    .card-corner-bot { font-size: 11px; color: var(--text2); text-align: right; font-family: var(--font-head); letter-spacing: 0.03em; }
+    .empty-hand { color: var(--text2); font-style: italic; padding: 10px 0; font-size: 15px; }
+
+    /* ── TRUMPS ROW ────────────────────── */
+    .placed-trumps { display: flex; gap: 8px; flex-wrap: wrap; min-height: 20px; }
+    .trump-chip {
+      padding: 4px 12px; border-radius: 999px;
+      background: rgba(212,175,95,0.1);
+      border: 1px solid rgba(212,175,95,0.2);
+      font-size: 12px; color: var(--gold);
+      font-family: var(--font-head); letter-spacing: 0.04em;
+    }
+
+    /* ── CENTER PANEL ──────────────────── */
+    .center-panel {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      display: grid; gap: 14px;
+    }
+    .saw-section { display: grid; gap: 8px; }
+    .saw-labels { display: flex; justify-content: space-between; font-size: 13px; }
+    .saw-track {
+      position: relative;
+      height: 14px; border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      overflow: visible;
+    }
+    .saw-fill-l {
+      position: absolute; top:0; left:0; bottom:0; border-radius: 999px 0 0 999px;
+      background: linear-gradient(90deg, rgba(192,57,43,0.7), rgba(192,57,43,0.3));
+      transition: width 0.5s;
+    }
+    .saw-fill-r {
+      position: absolute; top:0; right:0; bottom:0; border-radius: 0 999px 999px 0;
+      background: linear-gradient(270deg, rgba(39,174,96,0.7), rgba(39,174,96,0.3));
+      transition: width 0.5s;
+    }
+    .saw-blade {
+      position: absolute; top: 50%; width: 20px; height: 20px;
+      background: white; border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 16px rgba(255,255,255,0.7);
+      transition: left 0.5s;
+      z-index: 2;
+    }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .metric {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: grid; gap: 2px;
+    }
+    .metric-val { font-family: var(--font-head); font-size: 24px; color: var(--gold); font-weight: 700; }
+    .metric-lbl { font-size: 11px; color: var(--text2); letter-spacing: 0.06em; text-transform: uppercase; }
+    .timer-bar {
+      height: 6px; border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .timer-fill {
+      height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, var(--gold), var(--red2));
+      transition: width 0.25s linear;
+    }
+
+    /* ── ACTION ZONE ───────────────────── */
+    .action-zone {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      display: grid; gap: 14px;
+    }
+    .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+    .trump-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 10px; }
+    .trump-card {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      display: grid; gap: 8px;
+      transition: border-color 0.2s;
+    }
+    .trump-card:hover { border-color: var(--border2); }
+    .trump-card h4 { font-family: var(--font-head); font-size: 14px; color: var(--gold); }
+    .trump-card p { font-size: 13px; color: var(--text2); line-height: 1.4; }
+    .trump-family { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+
+    /* ── LOG ───────────────────────────── */
+    .log-panel {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      display: grid; gap: 12px;
+      align-content: start;
+    }
+    .log-scroll { max-height: 380px; overflow-y: auto; display: grid; gap: 8px; padding-right: 4px; }
+    .log-scroll::-webkit-scrollbar { width: 4px; }
+    .log-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+    .log-entry {
+      padding: 7px 12px;
+      border-left: 2px solid rgba(212,175,95,0.3);
+      font-size: 14px; color: var(--text2);
+      line-height: 1.4;
+    }
+    .log-entry:first-child { color: var(--text); border-left-color: var(--gold-dim); }
+
+    /* ── OVERLAY / MODAL ───────────────── */
+    .overlay, .modal-bg {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(5,7,10,0.78);
+      display: grid; place-items: center;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+    .modal-card, .result-card {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: 24px;
+      padding: 32px;
+      width: min(580px, 100%);
+      display: grid; gap: 18px;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+    }
+    .modal-card h3, .result-card h3 { font-family: var(--font-head); font-size: 26px; }
+    .result-card { text-align: center; }
+    .result-value {
+      font-family: var(--font-head);
+      font-size: 48px; font-weight: 900;
+      color: var(--gold);
+      text-shadow: 0 0 40px rgba(212,175,95,0.5);
+    }
+    .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* ── PASS OVERLAY ──────────────────── */
+    .pass-card {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: 24px;
+      padding: 40px 32px;
+      width: min(480px, 100%);
+      text-align: center;
+      display: grid; gap: 20px;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.9);
+    }
+    .pass-icon { font-size: 48px; }
+
+    /* ── NOTICE ────────────────────────── */
+    .notice-bar {
+      padding: 10px 18px; border-radius: 10px;
+      background: rgba(212,175,95,0.1);
+      border: 1px solid rgba(212,175,95,0.2);
+      color: var(--gold);
+      font-size: 14px;
+    }
+    .err-bar {
+      padding: 10px 18px; border-radius: 10px;
+      background: rgba(192,57,43,0.1);
+      border: 1px solid rgba(192,57,43,0.2);
+      color: #f1948a;
+      font-size: 14px;
+    }
+
+    /* ── SECTION TITLE ─────────────────── */
+    .section-head { display: grid; gap: 6px; }
+    .section-head h2 { font-size: 22px; }
+    .section-head p { color: var(--text2); font-size: 15px; }
+
+    /* ── RESPONSIVE ────────────────────── */
+    @media (max-width: 900px) {
+      .game-board { grid-template-columns: 1fr; }
+      .lobby-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      body { padding: 12px; }
+      .hero { padding: 24px 18px; }
+      .game-shell { padding: 12px; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ── ANIMATIONS ────────────────────── */
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .animate-in { animation: fadeIn 0.3s ease; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+    .pulsing { animation: pulse 2s ease infinite; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(() => {
+"use strict";
+
+/* ════════════════════════════════════════════
+   CONSTANTS & CONFIG
+════════════════════════════════════════════ */
+const APP_VERSION   = "2.0.0";
+const START_DISTANCE = 5;
+const START_BET      = 1;
+const TURN_TIME_MS   = 35000;
+const MAX_LOG        = 20;
+const NUMBER_VALUES  = Array.from({ length: 11 }, (_, i) => i + 1);
+const root = document.getElementById("app");
+
+const TRUMP_IDS = [
+  "2-card","3-card","4-card","5-card","6-card","7-card",
+  "go17","go24","go27",
+  "one-up","two-up","shield","shield-plus","bless","bloodshed",
+  "destroy","friendship","reincarnation","hush","perfect-draw",
+  "refresh","remove","return","exchange","disservice",
+];
+
+function makeTrump(id, name, mode, family, description, extra) {
+  return Object.assign({ id, name, mode, family, description }, extra || {});
+}
+const TRUMP_LIBRARY = {
+  "2-card":       makeTrump("2-card","2-Card","instant","Número","Roba el 2 si sigue en el mazo.",{exactValue:2}),
+  "3-card":       makeTrump("3-card","3-Card","instant","Número","Roba el 3 si sigue en el mazo.",{exactValue:3}),
+  "4-card":       makeTrump("4-card","4-Card","instant","Número","Roba el 4 si sigue en el mazo.",{exactValue:4}),
+  "5-card":       makeTrump("5-card","5-Card","instant","Número","Roba el 5 si sigue en el mazo.",{exactValue:5}),
+  "6-card":       makeTrump("6-card","6-Card","instant","Número","Roba el 6 si sigue en el mazo.",{exactValue:6}),
+  "7-card":       makeTrump("7-card","7-Card","instant","Número","Roba el 7 si sigue en el mazo.",{exactValue:7}),
+  go17:           makeTrump("go17","Ir al 17","persistent","Meta","Cambia el objetivo a 17.",{target:17}),
+  go24:           makeTrump("go24","Ir al 24","persistent","Meta","Cambia el objetivo a 24.",{target:24}),
+  go27:           makeTrump("go27","Ir al 27","persistent","Meta","Cambia el objetivo a 27.",{target:27}),
+  "one-up":       makeTrump("one-up","Subida x1","persistent","Apuesta","Sube el daño del rival en 1.",{betDelta:1}),
+  "two-up":       makeTrump("two-up","Subida x2","persistent","Apuesta","Sube el daño del rival en 2.",{betDelta:2}),
+  shield:         makeTrump("shield","Escudo","persistent","Defensa","Reduce tu daño entrante en 1.",{shieldDelta:1}),
+  "shield-plus":  makeTrump("shield-plus","Escudo+","persistent","Defensa","Reduce tu daño entrante en 2.",{shieldDelta:2}),
+  bless:          makeTrump("bless","Bendición","persistent","Defensa","Si este turno te mataría, Bendición te salva una vez.",{blessing:true}),
+  bloodshed:      makeTrump("bloodshed","Sangría","persistent","Apuesta","Sube daño rival en 1 y robas 1 trump.",{betDelta:1,extraTrump:1}),
+  destroy:        makeTrump("destroy","Destruir","instant","Contra","Destruye el trump persistente más reciente del rival."),
+  friendship:     makeTrump("friendship","Amistad","instant","Swing","Ambos jugadores roban 2 trumps."),
+  reincarnation:  makeTrump("reincarnation","Reencarnación","instant","Contra","Destruye el trump del rival y robas 1 trump."),
+  hush:           makeTrump("hush","Silencio","instant","Mazo","Roba una carta oculta del mazo."),
+  "perfect-draw": makeTrump("perfect-draw","Tiro Perfecto","instant","Mazo","Roba la mejor carta posible del mazo."),
+  refresh:        makeTrump("refresh","Renovar","instant","Mazo","Devuelve tu mano al mazo y roba 2 cartas nuevas."),
+  remove:         makeTrump("remove","Eliminar","instant","Mazo","Devuelve la última carta válida del rival al mazo."),
+  return:         makeTrump("return","Devolver","instant","Mazo","Devuelve tu última carta válida al mazo."),
+  exchange:       makeTrump("exchange","Intercambio","instant","Mazo","Intercambia la última carta válida de cada jugador."),
+  disservice:     makeTrump("disservice","Mal Servicio","instant","Mazo","Fuerza al rival a robar una carta visible."),
+};
+
+/* ════════════════════════════════════════════
+   RUNTIME & STATE
+════════════════════════════════════════════ */
+const runtime = {
+  renderQueued: false,
+  turnInterval: null,
+  turnDeadline: 0,
+  turnActivePlayer: null,
+  botTimer: null,
+  peer: null,
+  peerKind: "client",
+  peerOpening: null,
+  roomConnection: null,
+  heartbeatInterval: null,
+  reconnectTimer: null,
+  roomListToken: 0,
+  processedRemoteActions: new Set(),
+  autoJoinAttempted: false,
+};
+
+const DEFAULT_PEER_HOST = "0.peerjs.com";
+const DEFAULT_PEER_PORT = 443;
+const DEFAULT_PEER_PATH = "/";
+
+const state = {
+  screen: "menu",
+  menu: {
+    playerName: localStorage.getItem("to.playerName") || "Jugador",
+    onlineName:  localStorage.getItem("to.onlineName") || "Jugador Online",
+  },
+  ui: {
+    modal: null,
+    notice: "",
+    noticeIsError: false,
+  },
+  game: null,
+  online: {
+    role: "browser",
+    peerConfig: loadPeerConfig(),
+    peerStatus: "idle",
+    peerError: "",
+    peerId: "",
+    connectionStatus: "offline",
+    roomList: [],
+    roomMeta: null,
+    roomCodeInput: "",
+    discoveryError: "",
+    isRefreshing: false,
+    localHash: "",
+    remoteHash: "",
+    syncWarning: "",
+    reconnectAttempts: 0,
+  },
+};
+
+function loadPeerConfig() {
+  return {
+    host:   localStorage.getItem("to.peer.host")   || DEFAULT_PEER_HOST,
+    port:   Number(localStorage.getItem("to.peer.port")   || DEFAULT_PEER_PORT),
+    path:   localStorage.getItem("to.peer.path")   || DEFAULT_PEER_PATH,
+    secure: localStorage.getItem("to.peer.secure") !== "false",
+    debug:  1,
+  };
+}
+function savePeerConfig(cfg) {
+  state.online.peerConfig = {
+    host:   String(cfg.host||"").trim() || DEFAULT_PEER_HOST,
+    port:   Number(cfg.port||DEFAULT_PEER_PORT),
+    path:   normalizePath(cfg.path||DEFAULT_PEER_PATH),
+    secure: cfg.secure !== false && cfg.secure !== "false",
+    debug:  1,
+  };
+  const c = state.online.peerConfig;
+  localStorage.setItem("to.peer.host",   c.host);
+  localStorage.setItem("to.peer.port",   String(c.port));
+  localStorage.setItem("to.peer.path",   c.path);
+  localStorage.setItem("to.peer.secure", String(c.secure));
+}
+function normalizePath(p) { return (p && p.startsWith("/")) ? p : `/${p||""}`; }
+function isPeerConfigReady() { return !!state.online.peerConfig.host; }
+function getPeerOptions() {
+  const c = state.online.peerConfig;
+  return { host: c.host, port: c.port, path: normalizePath(c.path), secure: c.secure, debug: c.debug };
+}
+function getPeerHttpBase() {
+  const c = state.online.peerConfig;
+  const proto = c.secure ? "https" : "http";
+  const defaultPort = (c.secure && c.port===443) || (!c.secure && c.port===80);
+  const portPart = defaultPort ? "" : `:${c.port}`;
+  return `${proto}://${c.host}${portPart}${normalizePath(c.path)}`;
+}
+
+/* ════════════════════════════════════════════
+   UTILS
+════════════════════════════════════════════ */
+function otherPlayer(i) { return i===0?1:0; }
+function hashToUint32(s){ let h=2166136261; s=String(s); for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);} return h>>>0; }
+function consumeRandom(src){ src.rngState=(src.rngState+0x6d2b79f5)>>>0; let v=src.rngState; v=Math.imul(v^(v>>>15),v|1); v^=v+Math.imul(v^(v>>>7),v|61); return((v^(v>>>14))>>>0)/4294967296; }
+function shuffleWithSeed(arr,seed){ const a=arr.slice(),h={rngState:hashToUint32(seed)||1}; for(let i=a.length-1;i>0;i--){const j=Math.floor(consumeRandom(h)*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function randomCode(prefix){ const ab="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let o=prefix?`${prefix}-`:""; const h={rngState:hashToUint32(`${Date.now()}-${Math.random()}`)}; for(let i=0;i<6;i++) o+=ab[Math.floor(consumeRandom(h)*ab.length)]; return o; }
+function cloneSimple(v){ return JSON.parse(JSON.stringify(v)); }
+function esc(v){ return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+function getRoomCodeFromUrl(){ return new URLSearchParams(window.location.search).get("room")||""; }
+function setRoomCodeInUrl(id){ const p=new URLSearchParams(window.location.search); id?p.set("room",id):p.delete("room"); history.replaceState({},"",`${window.location.pathname}${p.toString()?`?${p}`:""}`); }
+
+/* ════════════════════════════════════════════
+   GAME ENGINE
+════════════════════════════════════════════ */
+function createCard(game, value, ownerIndex, opts) {
+  return {
+    uid: `${game.roundNumber}-${ownerIndex}-${game.nextCardOrder}`,
+    value, ownerIndex,
+    hiddenFromOpponent: !!opts.hiddenFromOpponent,
+    source: opts.source||"draw",
+    recentEligible: opts.recentEligible!==false,
+    drawOrder: game.nextCardOrder++,
+  };
+}
+function createPlayer(name, control, peerId) {
+  return { name, control, peerId:peerId||"", sawDistance:START_DISTANCE, hand:[], trumps:[], stayed:false, timedOut:false };
+}
+function buildGame(mode, players) {
+  return { mode, phase:"playing", roundNumber:0, baseBet:START_BET, seed:"", rngState:1, nextCardOrder:1, activePlayer:0, deck:[], trumpDeck:[], placedTrumps:[], log:[], result:null, actionSeq:0, players };
+}
+function computeGameHash(game) {
+  const plain = { mode:game.mode, phase:game.phase, roundNumber:game.roundNumber, baseBet:game.baseBet, seed:game.seed, rngState:game.rngState, nextCardOrder:game.nextCardOrder, activePlayer:game.activePlayer, deck:game.deck.slice(), trumpDeck:game.trumpDeck.slice(), placedTrumps:game.placedTrumps.map(t=>({uid:t.uid,id:t.id,ownerIndex:t.ownerIndex,placedOrder:t.placedOrder})), players:game.players.map(p=>({name:p.name,sawDistance:p.sawDistance,stayed:p.stayed,timedOut:p.timedOut,trumps:p.trumps.slice(),hand:p.hand.map(c=>({uid:c.uid,value:c.value,hiddenFromOpponent:c.hiddenFromOpponent,source:c.source,recentEligible:c.recentEligible,drawOrder:c.drawOrder}))})), result:game.result?{winnerIndex:game.result.winnerIndex,loserIndex:game.result.loserIndex,damage:game.result.damage,reason:game.result.reason,blessSaved:game.result.blessSaved}:null };
+  let h=5381; const t=JSON.stringify(plain);
+  for(let i=0;i<t.length;i++) h=(h*33)^t.charCodeAt(i);
+  return (h>>>0).toString(16);
+}
+function pushLog(game, msg){ game.log.unshift(msg); game.log=game.log.slice(0,MAX_LOG); }
+function getCurrentTarget(game){ for(let i=game.placedTrumps.length-1;i>=0;i--){ const t=TRUMP_LIBRARY[game.placedTrumps[i].id]; if(t.target) return t.target; } return 21; }
+function getHandTotal(game,pi){ return game.players[pi].hand.reduce((s,c)=>s+c.value,0); }
+function getVisibleTotal(game,pi,vi){ const rev=game.phase!=="playing"; return game.players[pi].hand.reduce((s,c)=>{ if(rev||vi===pi||!c.hiddenFromOpponent) return s+c.value; return s; },0); }
+function getBetPressure(game,pi){ const ei=otherPlayer(pi); const atk=game.placedTrumps.filter(t=>t.ownerIndex===ei).reduce((s,t)=>s+(TRUMP_LIBRARY[t.id].betDelta||0),0); const sh=game.placedTrumps.filter(t=>t.ownerIndex===pi).reduce((s,t)=>s+(TRUMP_LIBRARY[t.id].shieldDelta||0),0); return Math.max(0,game.baseBet+atk-sh); }
+function hasBless(game,pi){ return game.placedTrumps.some(t=>t.ownerIndex===pi&&TRUMP_LIBRARY[t.id].blessing); }
+function removeExistingGoal(game){ game.placedTrumps=game.placedTrumps.filter(t=>!TRUMP_LIBRARY[t.id].target); }
+function placePersistentTrump(game,pi,tid){ if(TRUMP_LIBRARY[tid].target) removeExistingGoal(game); game.placedTrumps.push({uid:`${tid}-${game.roundNumber}-${game.placedTrumps.length+1}`,id:tid,ownerIndex:pi,placedOrder:game.placedTrumps.length+1}); }
+function drawTrump(game,pi,count,reason){ let drawn=0; while(drawn<count&&game.trumpDeck.length){ const tid=game.trumpDeck.shift(); game.players[pi].trumps.push(tid); drawn++; pushLog(game,`${game.players[pi].name} obtuvo ${TRUMP_LIBRARY[tid].name} (${reason}).`); } return drawn; }
+function insertCardBackIntoDeck(game,card){ const idx=Math.floor(consumeRandom(game)*(game.deck.length+1)); game.deck.splice(idx,0,card.value); }
+function removeCardByIndex(player,idx){ if(idx<0||idx>=player.hand.length) return null; return player.hand.splice(idx,1)[0]; }
+function findRecentEligibleCard(game,pi){ const p=game.players[pi]; let best=null; p.hand.forEach((c,i)=>{ if(!c.recentEligible) return; if(c.hiddenFromOpponent&&p.hand.length===1) return; if(!best||c.drawOrder>best.card.drawOrder) best={card:c,index:i}; }); return best; }
+function drawNumberCard(game,pi,opts){ const pick=opts||{}; let di=0; if(pick.exactValue!==undefined) di=game.deck.indexOf(pick.exactValue); else if(typeof pick.findIndex==="function") di=pick.findIndex(game.deck.slice()); if(di<0||di>=game.deck.length) return null; const val=game.deck.splice(di,1)[0]; const card=createCard(game,val,pi,{hiddenFromOpponent:!!pick.hiddenFromOpponent,source:pick.source||"draw",recentEligible:pick.recentEligible!==false}); game.players[pi].hand.push(card); return card; }
+function drawPerfectCard(game,pi){ const target=getCurrentTarget(game),total=getHandTotal(game,pi); const scored=game.deck.map((v,i)=>({index:i,value:v,busted:total+v>target,distance:Math.abs(target-(total+v))})); if(!scored.length) return null; scored.sort((a,b)=>{ if(a.busted!==b.busted) return a.busted?1:-1; if(a.distance!==b.distance) return a.distance-b.distance; return b.value-a.value; }); return drawNumberCard(game,pi,{findIndex(){return scored[0].index;},hiddenFromOpponent:false,source:"perfect-draw"}); }
+function destroyLatestEnemyTrump(game,pi){ for(let i=game.placedTrumps.length-1;i>=0;i--){ if(game.placedTrumps[i].ownerIndex!==pi) return game.placedTrumps.splice(i,1)[0]; } return null; }
+
+function applyTrump(game, pi, tid) {
+  const player=game.players[pi], ei=otherPlayer(pi), enemy=game.players[ei], trump=TRUMP_LIBRARY[tid];
+  if(trump.exactValue!==undefined){ const card=drawNumberCard(game,pi,{exactValue:trump.exactValue,hiddenFromOpponent:false,source:trump.id}); pushLog(game,card?`${player.name} usó ${trump.name} y robó ${card.value}.`:`${player.name} usó ${trump.name}, pero la carta ya no estaba.`); return; }
+  switch(tid){
+    case "go17": case "go24": case "go27":
+    case "one-up": case "two-up": case "shield": case "shield-plus": case "bless":
+      placePersistentTrump(game,pi,tid);
+      if(trump.target) pushLog(game,`${player.name} cambió el objetivo a ${trump.target}.`);
+      else if(trump.shieldDelta) pushLog(game,`${player.name} usó ${trump.name} y bajó su daño entrante en ${trump.shieldDelta}.`);
+      else if(trump.betDelta) pushLog(game,`${player.name} usó ${trump.name} y subió el peligro de ${enemy.name} en ${trump.betDelta}.`);
+      else pushLog(game,`${player.name} activó Bendición y está protegido de la muerte.`);
+      break;
+    case "bloodshed": placePersistentTrump(game,pi,tid); pushLog(game,`${player.name} usó Sangría y subió el peligro de ${enemy.name} en 1.`); drawTrump(game,pi,1,"Sangría"); break;
+    case "destroy": { const r=destroyLatestEnemyTrump(game,pi); pushLog(game,r?`${player.name} destruyó ${TRUMP_LIBRARY[r.id].name} de ${enemy.name}.`:`${player.name} usó Destruir, pero no había nada.`); break; }
+    case "reincarnation": { const r=destroyLatestEnemyTrump(game,pi); if(r){pushLog(game,`${player.name} usó Reencarnación y eliminó ${TRUMP_LIBRARY[r.id].name} de ${enemy.name}.`);drawTrump(game,pi,1,"Reencarnación");}else pushLog(game,`${player.name} usó Reencarnación, pero no había objetivo.`); break; }
+    case "friendship": drawTrump(game,pi,2,"Amistad"); drawTrump(game,ei,2,"Amistad"); pushLog(game,`${player.name} usó Amistad. Ambos robaron 2 trumps.`); break;
+    case "hush": { const c=drawNumberCard(game,pi,{hiddenFromOpponent:true,source:"hush"}); pushLog(game,c?`${player.name} usó Silencio y robó una carta oculta.`:`${player.name} usó Silencio, pero el mazo estaba vacío.`); break; }
+    case "perfect-draw": { const c=drawPerfectCard(game,pi); pushLog(game,c?`${player.name} usó Tiro Perfecto y encontró ${c.value}.`:`${player.name} usó Tiro Perfecto, pero no había carta disponible.`); break; }
+    case "refresh": { const cards=player.hand.splice(0,player.hand.length); cards.forEach(c=>insertCardBackIntoDeck(game,c)); const a=drawNumberCard(game,pi,{hiddenFromOpponent:false,source:"refresh"}); const b=drawNumberCard(game,pi,{hiddenFromOpponent:true,source:"refresh"}); pushLog(game,(a||b)?`${player.name} renovó su mano y robó 2 cartas nuevas.`:`${player.name} usó Renovar, pero no había cartas.`); break; }
+    case "remove": { const t=findRecentEligibleCard(game,ei); if(t){const r=removeCardByIndex(enemy,t.index);insertCardBackIntoDeck(game,r);pushLog(game,`${player.name} eliminó la última carta de ${enemy.name} (${r.value}).`);}else pushLog(game,`${player.name} usó Eliminar, pero ${enemy.name} no tenía carta válida.`); break; }
+    case "return": { const t=findRecentEligibleCard(game,pi); if(t){const r=removeCardByIndex(player,t.index);insertCardBackIntoDeck(game,r);pushLog(game,`${player.name} devolvió la carta ${r.value} al mazo.`);}else pushLog(game,`${player.name} usó Devolver, pero no tenía carta válida.`); break; }
+    case "exchange": { const oc=findRecentEligibleCard(game,pi),ec=findRecentEligibleCard(game,ei); if(oc&&ec){const o=player.hand[oc.index],e=enemy.hand[ec.index];player.hand[oc.index]=Object.assign({},e,{ownerIndex:pi,drawOrder:game.nextCardOrder++});enemy.hand[ec.index]=Object.assign({},o,{ownerIndex:ei,drawOrder:game.nextCardOrder++});pushLog(game,`${player.name} intercambió cartas con ${enemy.name}.`);}else pushLog(game,`${player.name} usó Intercambio, pero faltaba una carta válida.`); break; }
+    case "disservice": { const c=drawNumberCard(game,ei,{hiddenFromOpponent:false,source:"disservice"}); pushLog(game,c?`${player.name} forzó a ${enemy.name} a robar ${c.value}.`:`${player.name} usó Mal Servicio, pero el mazo estaba vacío.`); break; }
+    default: pushLog(game,`${player.name} usó ${trump.name}, pero nada ocurrió.`);
+  }
+}
+
+function prepareRound(game,seed){
+  game.phase="playing"; game.roundNumber++; game.seed=seed;
+  game.rngState=hashToUint32(`${seed}:live`)||1; game.nextCardOrder=1;
+  game.deck=shuffleWithSeed(NUMBER_VALUES,`${seed}:deck`);
+  game.trumpDeck=shuffleWithSeed(TRUMP_IDS,`${seed}:trump`);
+  game.placedTrumps=[]; game.actionSeq=0; game.result=null;
+  game.activePlayer=(game.roundNumber-1)%2;
+  game.players.forEach(p=>{ p.hand=[]; p.trumps=[]; p.stayed=false; p.timedOut=false; });
+  for(let pi=0;pi<game.players.length;pi++){
+    drawNumberCard(game,pi,{hiddenFromOpponent:false,source:"inicial-visible",recentEligible:true});
+    drawNumberCard(game,pi,{hiddenFromOpponent:true,source:"inicial-oculta",recentEligible:false});
+    drawTrump(game,pi,2,"inicio-ronda");
+  }
+  pushLog(game,`Ronda ${game.roundNumber} iniciada. Objetivo: ${getCurrentTarget(game)}.`);
+}
+
+function createMatch(mode,names){
+  const players = mode==="bot"
+    ? [createPlayer(names[0],"local"),createPlayer(names[1],"bot")]
+    : [createPlayer(names[0],"local"),createPlayer(names[1],"remote")];
+  const game=buildGame(mode,players);
+  prepareRound(game,generateSeed(mode));
+  state.game=game;
+  state.screen="game";
+  state.ui.viewerIndex = mode==="online" ? getOnlineLocalPlayerIndex() : 0;
+  state.online.localHash=computeGameHash(game);
+  state.online.remoteHash="";
+  state.online.syncWarning="";
+}
+function generateSeed(label){ return `${label}-${Date.now()}-${Math.random().toString(36).slice(2,9)}`; }
+
+function resolveRound(game){
+  const target=getCurrentTarget(game);
+  const p0={index:0,total:getHandTotal(game,0),timedOut:game.players[0].timedOut,busted:getHandTotal(game,0)>target};
+  const p1={index:1,total:getHandTotal(game,1),timedOut:game.players[1].timedOut,busted:getHandTotal(game,1)>target};
+  let winnerIndex=null,loserIndex=null,reason="tie";
+  if(p0.timedOut&&!p1.timedOut){winnerIndex=1;loserIndex=0;reason="timeout";}
+  else if(p1.timedOut&&!p0.timedOut){winnerIndex=0;loserIndex=1;reason="timeout";}
+  else if(p0.busted&&p1.busted){ if(p0.total<p1.total){winnerIndex=0;loserIndex=1;reason="doble-bust";}else if(p1.total<p0.total){winnerIndex=1;loserIndex=0;reason="doble-bust";} }
+  else if(p0.busted){winnerIndex=1;loserIndex=0;reason="bust";}
+  else if(p1.busted){winnerIndex=0;loserIndex=1;reason="bust";}
+  else{ const d0=Math.abs(target-p0.total),d1=Math.abs(target-p1.total); if(d0<d1){winnerIndex=0;loserIndex=1;reason="más cerca";}else if(d1<d0){winnerIndex=1;loserIndex=0;reason="más cerca";} }
+  let damage=0,blessSaved=false,matchWinnerIndex=null;
+  if(loserIndex!==null){
+    damage=getBetPressure(game,loserIndex);
+    if(hasBless(game,loserIndex)&&damage>=game.players[loserIndex].sawDistance&&game.players[loserIndex].sawDistance>0){blessSaved=true;damage=0;}
+    game.players[loserIndex].sawDistance=Math.max(0,game.players[loserIndex].sawDistance-damage);
+    if(game.players[loserIndex].sawDistance<=0) matchWinnerIndex=winnerIndex;
+  }
+  game.baseBet=blessSaved?Math.max(0,game.baseBet-1):game.baseBet+1;
+  game.result={winnerIndex,loserIndex,target,damage,blessSaved,reason,matchWinnerIndex,totals:[p0.total,p1.total]};
+  game.phase=matchWinnerIndex===null?"round-end":"match-end";
+  if(winnerIndex===null) pushLog(game,`Ronda ${game.roundNumber} terminó en empate. La sierra no se movió.`);
+  else{
+    pushLog(game,`${game.players[winnerIndex].name} ganó la ronda ${game.roundNumber}. ${game.players[loserIndex].name} perdió ${damage} de distancia.`);
+    if(blessSaved) pushLog(game,`La Bendición de ${game.players[loserIndex].name} evitó un golpe letal.`);
+    if(matchWinnerIndex!==null) pushLog(game,`¡${game.players[matchWinnerIndex].name} ganó la partida completa!`);
+  }
+}
+
+function advanceTurn(game,actorIndex){
+  if(game.players.every(p=>p.stayed)){resolveRound(game);return;}
+  const ei=otherPlayer(actorIndex);
+  game.activePlayer=game.players[ei].stayed?actorIndex:ei;
+}
+
+function applyAction(game,action){
+  if(!game) return false;
+  if(action.type==="next-round"){
+    if(game.phase!=="round-end") return false;
+    prepareRound(game,action.seed); return true;
+  }
+  if(game.phase!=="playing") return false;
+  const actor=action.playerIndex;
+  if(actor!==game.activePlayer) return false;
+  const player=game.players[actor];
+  if(!player||player.stayed) return false;
+  if(action.type==="play-trump"){
+    const tid=player.trumps.splice(action.trumpIndex,1)[0];
+    if(!tid) return false;
+    applyTrump(game,actor,tid); return true;
+  }
+  if(action.type==="draw-card"){
+    const card=drawNumberCard(game,actor,{hiddenFromOpponent:false,source:"draw"});
+    pushLog(game,card?`${player.name} robó ${card.value}.`:`${player.name} intentó robar, pero el mazo estaba vacío.`);
+    advanceTurn(game,actor); return true;
+  }
+  if(action.type==="stay"){
+    player.stayed=true; pushLog(game,`${player.name} se plantó.`);
+    advanceTurn(game,actor); return true;
+  }
+  if(action.type==="timeout"){
+    player.stayed=true; player.timedOut=true;
+    pushLog(game,`${player.name} se quedó sin tiempo y se plantó automáticamente.`);
+    advanceTurn(game,actor); return true;
+  }
+  return false;
+}
+
+function buildAction(type,payload){
+  const game=state.game, seq=game?game.actionSeq+1:1;
+  return Object.assign({type,seq,seed:game?game.seed:"",actionId:`${game?game.roundNumber:0}-${seq}-${Date.now()}`},payload||{});
+}
+
+/* ════════════════════════════════════════════
+   TURN / BOT
+════════════════════════════════════════════ */
+function getOnlineLocalPlayerIndex(){ return state.online.role==="guest"?1:0; }
+function getViewerIndex(){ if(!state.game) return 0; if(state.game.mode==="online") return getOnlineLocalPlayerIndex(); return 0; }
+function isTimerAuthority(){ return !state.game||state.game.mode!=="online"||state.online.role==="host"; }
+
+function startTurnFlow(){
+  clearTimeout(runtime.botTimer); clearInterval(runtime.turnInterval);
+  runtime.botTimer=null; runtime.turnInterval=null;
+  runtime.turnDeadline=0; runtime.turnActivePlayer=null;
+  if(!state.game||state.game.phase!=="playing"){ queueRender(); return; }
+  runtime.turnActivePlayer=state.game.activePlayer;
+  runtime.turnDeadline=Date.now()+TURN_TIME_MS;
+  runtime.turnInterval=window.setInterval(()=>{
+    if(!state.game||state.game.phase!=="playing"){ clearInterval(runtime.turnInterval); runtime.turnInterval=null; return; }
+    if(isTimerAuthority()&&runtime.turnActivePlayer===state.game.activePlayer&&Date.now()>=runtime.turnDeadline){
+      clearInterval(runtime.turnInterval); runtime.turnInterval=null;
+      performLocalGameAction(buildAction("timeout",{playerIndex:state.game.activePlayer})); return;
+    }
+    queueRender();
+  },250);
+  if(state.game.players[state.game.activePlayer].control==="bot"){
+    runtime.botTimer=window.setTimeout(()=>runBotTurn(),900);
+  }
+  queueRender();
+}
+function getTimeLeftMs(){ if(!state.game||state.game.phase!=="playing"||!runtime.turnDeadline) return TURN_TIME_MS; return Math.max(0,runtime.turnDeadline-Date.now()); }
+
+function performLocalGameAction(action){
+  if(!state.game) return;
+  const applied=applyAction(state.game,action);
+  if(!applied) return;
+  state.game.actionSeq=Math.max(state.game.actionSeq,action.seq||0);
+  state.online.localHash=computeGameHash(state.game);
+  state.online.syncWarning="";
+  if(state.game.mode==="online"){
+    sendRoomMessage({type:"action",action,hashAfter:state.online.localHash});
+  }
+  postActionHousekeeping(action);
+}
+
+function applyRemoteGameAction(payload){
+  if(!state.game||runtime.processedRemoteActions.has(payload.action.actionId)) return;
+  runtime.processedRemoteActions.add(payload.action.actionId);
+  const applied=applyAction(state.game,payload.action);
+  if(!applied){ if(state.online.role==="host") sendSnapshot("remote-rejected"); return; }
+  state.game.actionSeq=Math.max(state.game.actionSeq,payload.action.seq||0);
+  state.online.localHash=computeGameHash(state.game);
+  if(state.online.localHash!==payload.hashAfter){
+    state.online.syncWarning="Desincronización detectada. Aplicando snapshot...";
+    if(state.online.role==="host") sendSnapshot("hash-mismatch");
+    else sendRoomMessage({type:"state-hash",mismatch:true,seq:payload.action.seq,hash:state.online.localHash});
+  } else {
+    sendRoomMessage({type:"state-hash",mismatch:false,seq:payload.action.seq,hash:state.online.localHash});
+  }
+  postActionHousekeeping(payload.action);
+}
+
+function postActionHousekeeping(action){
+  if(!state.game) return;
+  if(action.type==="next-round") runtime.processedRemoteActions.clear();
+  startTurnFlow(); queueRender();
+}
+
+function runBotTurn(){
+  if(!state.game||state.game.phase!=="playing") return;
+  if(state.game.players[state.game.activePlayer].control!=="bot") return;
+  const candidate=chooseBotAction();
+  if(candidate) performLocalGameAction(candidate);
+}
+function chooseBotAction(){
+  const game=state.game, bi=game.activePlayer, ei=otherPlayer(bi);
+  const target=getCurrentTarget(game), own=getHandTotal(game,bi);
+  const ev=getVisibleTotal(game,ei,bi), eh=game.players[ei].hand.filter(c=>c.hiddenFromOpponent).length;
+  const estEnemy=ev+eh*5, danger=getBetPressure(game,bi);
+  const couldDie=danger>=game.players[bi].sawDistance;
+  const av=game.players[bi].trumps.slice();
+  const fi=id=>av.indexOf(id), cu=id=>fi(id)>=0;
+  if(couldDie&&cu("bless")) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("bless")});
+  if(danger>0&&cu("shield-plus")) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("shield-plus")});
+  if(danger>1&&cu("shield")) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("shield")});
+  if(own>target&&cu("return")&&findRecentEligibleCard(game,bi)) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("return")});
+  if(own>target&&cu("exchange")&&findRecentEligibleCard(game,bi)&&findRecentEligibleCard(game,ei)) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("exchange")});
+  if(own>target&&cu("refresh")) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("refresh")});
+  if(own<target&&cu("perfect-draw")) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("perfect-draw")});
+  if(estEnemy>=target-1&&cu("disservice")) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("disservice")});
+  if(cu("destroy")&&game.placedTrumps.some(t=>t.ownerIndex===ei)) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("destroy")});
+  if(own===17&&cu("go17")&&target!==17) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("go17")});
+  if(own===24&&cu("go24")&&target!==24) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("go24")});
+  if(own===27&&cu("go27")&&target!==27) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("go27")});
+  if(own<target-3&&cu("7-card")&&game.deck.includes(7)) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("7-card")});
+  if(own<estEnemy&&cu("two-up")) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("two-up")});
+  if(own<estEnemy&&cu("one-up")) return buildAction("play-trump",{playerIndex:bi,trumpIndex:fi("one-up")});
+  const safe=game.deck.filter(v=>own+v<=target);
+  const stay=own>=target||(own>=target-2&&own>=estEnemy)||(!safe.length&&own>=estEnemy);
+  if(stay) return buildAction("stay",{playerIndex:bi});
+  if(own<=target-4||safe.length) return buildAction("draw-card",{playerIndex:bi});
+  return buildAction("stay",{playerIndex:bi});
+}
+
+/* ════════════════════════════════════════════
+   ONLINE / P2P
+════════════════════════════════════════════ */
+async function openOnlineBrowser(){
+  state.screen="online-browser"; queueRender();
+  await ensurePeer("client");
+  await refreshRooms();
+  if(state.online.roomCodeInput&&getRoomCodeFromUrl()){
+    await joinRoom(state.online.roomCodeInput);
+  }
+}
+
+async function ensurePeer(kind,roomId){
+  if(!window.Peer) throw new Error("PeerJS no cargó correctamente.");
+  const expPrefix=kind==="room"?"room-":"client-";
+  if(runtime.peer&&state.online.peerStatus==="open"&&state.online.peerId.startsWith(expPrefix)) return runtime.peer;
+  if(runtime.peerOpening) return runtime.peerOpening;
+  cleanupOnlineRuntime(false);
+  state.online.peerStatus="connecting"; state.online.peerError=""; queueRender();
+  runtime.peerOpening=new Promise((resolve,reject)=>{
+    const pid=kind==="room"?roomId:randomCode("client");
+    const peer=new window.Peer(pid,getPeerOptions());
+    runtime.peer=peer; runtime.peerKind=kind;
+    peer.on("open",id=>{ runtime.peerOpening=null; state.online.peerStatus="open"; state.online.peerId=id; wirePeerEvents(peer); queueRender(); resolve(peer); });
+    peer.on("error",err=>{ runtime.peerOpening=null; state.online.peerStatus="error"; state.online.peerError=String(err&&err.message?err.message:err); queueRender(); reject(err); });
+  });
+  return runtime.peerOpening;
+}
+function wirePeerEvents(peer){
+  peer.on("connection",conn=>wireConnection(conn));
+  peer.on("disconnected",()=>{ state.online.peerStatus="disconnected"; queueRender(); });
+  peer.on("close",()=>{ state.online.peerStatus="closed"; queueRender(); });
+}
+function wireConnection(conn){
+  conn.on("data",msg=>handleRoomMessage(msg,conn));
+  conn.on("close",()=>handleConnectionClose(conn));
+  conn.on("error",()=>handleConnectionClose(conn));
+}
+function handleConnectionClose(conn){
+  if(!runtime.roomConnection||conn.peer!==runtime.roomConnection.peer) return;
+  stopHeartbeat(); state.online.connectionStatus="disconnected";
+  if(state.online.role==="guest"&&state.screen!=="menu") attemptReconnect();
+  queueRender();
+}
+function stopHeartbeat(){ clearInterval(runtime.heartbeatInterval); runtime.heartbeatInterval=null; }
+function startHeartbeat(){ stopHeartbeat(); runtime.heartbeatInterval=window.setInterval(()=>sendRoomMessage({type:"heartbeat",at:Date.now()}),5000); }
+function attemptReconnect(){
+  if(!state.online.roomMeta||state.online.role!=="guest") return;
+  clearTimeout(runtime.reconnectTimer); state.online.reconnectAttempts++;
+  runtime.reconnectTimer=window.setTimeout(()=>{
+    safeAsync(async()=>{ await ensurePeer("client"); await joinRoom(state.online.roomMeta.roomId,true); state.online.syncWarning="Reconexión completada."; queueRender(); });
+  },Math.min(1000*state.online.reconnectAttempts,5000));
+}
+
+async function refreshRooms(){
+  if(!isPeerConfigReady()){ state.online.discoveryError="Configura el servidor PeerJS."; queueRender(); return; }
+  state.online.isRefreshing=true; state.online.discoveryError="";
+  const token=++runtime.roomListToken; queueRender();
+  try {
+    await ensurePeer("client");
+    const resp=await fetch(`${getPeerHttpBase()}/peers`,{mode:"cors",credentials:"omit"});
+    if(!resp.ok) throw new Error(`Discovery falló con estado ${resp.status}.`);
+    const peerIds=await resp.json();
+    const roomIds=peerIds.filter(id=>id.startsWith("room-")&&id!==state.online.peerId);
+    const metas=await Promise.all(roomIds.map(id=>requestRoomMeta(id)));
+    if(token!==runtime.roomListToken) return;
+    state.online.roomList=metas.filter(Boolean).filter(r=>r.visibility==="public"&&r.players<2&&r.version===APP_VERSION).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  } catch(err){ state.online.discoveryError=String(err&&err.message?err.message:err); }
+  finally { state.online.isRefreshing=false; queueRender(); }
+}
+
+function requestRoomMeta(roomId){
+  return new Promise(resolve=>{
+    if(!runtime.peer){ resolve(null); return; }
+    const conn=runtime.peer.connect(roomId,{reliable:true,metadata:{type:"meta-request",requester:state.online.peerId}});
+    let settled=false;
+    const finish=v=>{ if(settled) return; settled=true; try{conn.close();}catch(e){} resolve(v); };
+    conn.on("open",()=>conn.send({type:"hello",request:"room-meta",version:APP_VERSION}));
+    conn.on("data",msg=>{ if(msg.type==="room-meta") finish(msg.room); });
+    conn.on("error",()=>finish(null)); conn.on("close",()=>finish(null));
+    window.setTimeout(()=>finish(null),2000);
+  });
+}
+
+async function createRoomFromModal(){
+  const roomName=(document.getElementById("cr-name")||{}).value||"";
+  const playerName=(document.getElementById("cr-player")||{}).value||"";
+  const visibility=(document.getElementById("cr-vis")||{}).value||"public";
+  const safePlayer=String(playerName).trim()||state.menu.onlineName||"Host";
+  const safeRoom=String(roomName).trim()||`Mesa de ${safePlayer}`;
+  const roomId=randomCode("room");
+  localStorage.setItem("to.onlineName",safePlayer);
+  state.menu.onlineName=safePlayer;
+  await ensurePeer("room",roomId);
+  state.online.role="host"; state.online.connectionStatus="hosting";
+  state.online.roomMeta={roomId,roomName:safeRoom,hostPeerId:roomId,hostName:safePlayer,guestName:"",visibility,players:1,status:"lobby",createdAt:new Date().toISOString(),version:APP_VERSION};
+  state.online.roomCodeInput=roomId;
+  state.ui.modal=null; state.screen="online-lobby"; state.online.syncWarning="";
+  setRoomCodeInUrl(roomId); queueRender();
+}
+
+async function joinRoom(roomId,isReconnect){
+  const safe=String(roomId||"").trim().toUpperCase();
+  if(!safe) return;
+  await ensurePeer("client");
+  state.online.connectionStatus=isReconnect?"reconnecting":"joining";
+  state.online.syncWarning=""; queueRender();
+  const conn=runtime.peer.connect(safe,{reliable:true,metadata:{type:"join-request",requester:state.online.peerId}});
+  wireConnection(conn);
+  return new Promise((resolve,reject)=>{
+    let settled=false;
+    const done=h=>v=>{ if(settled) return; settled=true; h(v); };
+    const res=done(resolve),rej=done(reject);
+    conn.on("open",()=>conn.send({type:"join-request",version:APP_VERSION,guestName:state.menu.onlineName||"Guest",fromPeerId:state.online.peerId,reconnect:!!isReconnect}));
+    conn.on("data",msg=>{
+      if(msg.type==="join-accept"){
+        runtime.roomConnection=conn; state.online.role="guest"; state.online.connectionStatus="connected";
+        state.online.roomMeta=msg.room; state.online.reconnectAttempts=0;
+        state.screen=msg.room.status==="playing"?"game":"online-lobby";
+        state.ui.modal=null; setRoomCodeInUrl(msg.room.roomId); startHeartbeat(); queueRender(); res(msg);
+      } else if(msg.type==="join-reject"){
+        state.online.connectionStatus="rejected"; state.online.syncWarning=msg.reason||"No se pudo entrar a la sala.";
+        try{conn.close();}catch(e){} queueRender(); rej(new Error(msg.reason||"Join rejected"));
+      }
+    });
+    conn.on("error",e=>rej(e));
+  });
+}
+
+function sendRoomMessage(msg){ if(!runtime.roomConnection||!runtime.roomConnection.open) return; runtime.roomConnection.send(msg); }
+function sendSnapshot(reason){ if(state.online.role!=="host"||!state.game) return; sendRoomMessage({type:"snapshot",reason,game:cloneSimple(state.game),room:cloneSimple(state.online.roomMeta)}); }
+
+function handleRoomMessage(msg,conn){
+  if(!msg||typeof msg!=="object") return;
+  if(msg.type==="hello"&&msg.request==="room-meta"){
+    if(state.online.role==="host"&&state.online.roomMeta) conn.send({type:"room-meta",room:cloneSimple(state.online.roomMeta)}); return;
+  }
+  if(msg.type==="join-request"){
+    if(state.online.role!=="host"||!state.online.roomMeta){ conn.send({type:"join-reject",reason:"Host no disponible."}); return; }
+    if(state.online.roomMeta.players>=2&&conn.peer!==(runtime.roomConnection&&runtime.roomConnection.peer)){ conn.send({type:"join-reject",reason:"La sala está llena."}); return; }
+    runtime.roomConnection=conn; state.online.roomMeta.players=2; state.online.roomMeta.guestName=msg.guestName||"Guest";
+    state.online.connectionStatus="connected"; state.screen=state.game?"game":"online-lobby";
+    conn.send({type:"join-accept",room:cloneSimple(state.online.roomMeta)});
+    startHeartbeat(); if(state.game) window.setTimeout(()=>sendSnapshot("rejoin"),120);
+    queueRender(); return;
+  }
+  if(msg.type==="start-game"){ state.game=cloneSimple(msg.game); state.screen="game"; state.online.localHash=computeGameHash(state.game); state.online.remoteHash=""; state.online.syncWarning=""; startTurnFlow(); queueRender(); return; }
+  if(msg.type==="action"){ applyRemoteGameAction(msg); return; }
+  if(msg.type==="state-hash"){ state.online.remoteHash=msg.hash; if(msg.mismatch&&state.online.role==="host") sendSnapshot("guest-mismatch"); queueRender(); return; }
+  if(msg.type==="snapshot"){ state.game=cloneSimple(msg.game); state.online.roomMeta=cloneSimple(msg.room); state.online.localHash=computeGameHash(state.game); state.online.syncWarning="Snapshot aplicado para resincronizar."; startTurnFlow(); queueRender(); return; }
+  if(msg.type==="heartbeat"){ state.online.connectionStatus="synced"; queueRender(); return; }
+  if(msg.type==="leave"){
+    state.online.syncWarning="El otro jugador abandonó la sala.";
+    if(state.online.role==="host"&&state.online.roomMeta){ state.online.roomMeta.players=1; state.online.roomMeta.guestName=""; runtime.roomConnection=null; state.online.connectionStatus="hosting"; }
+    else leaveRoomToBrowser();
+    queueRender();
+  }
+}
+
+function cleanupOnlineRuntime(skipDestroy){
+  clearInterval(runtime.heartbeatInterval); clearInterval(runtime.turnInterval);
+  clearTimeout(runtime.botTimer); clearTimeout(runtime.reconnectTimer);
+  runtime.heartbeatInterval=runtime.turnInterval=runtime.botTimer=runtime.reconnectTimer=null;
+  runtime.turnDeadline=0; runtime.turnActivePlayer=null; runtime.processedRemoteActions.clear();
+  if(runtime.roomConnection){ try{runtime.roomConnection.close();}catch(e){} }
+  runtime.roomConnection=null;
+  if(!skipDestroy&&runtime.peer){ try{runtime.peer.destroy();}catch(e){} runtime.peer=null; state.online.peerId=""; state.online.peerStatus="idle"; }
+}
+
+function leaveRoomToBrowser(){
+  sendRoomMessage({type:"leave",reason:"left-manually"});
+  cleanupOnlineRuntime(false);
+  state.game=null; state.screen="online-browser"; state.online.role="browser";
+  state.online.connectionStatus="offline"; state.online.roomMeta=null;
+  state.online.localHash=""; state.online.remoteHash=""; state.online.reconnectAttempts=0;
+  setRoomCodeInUrl(""); queueRender();
+}
+function startHostedOnlineGame(){
+  if(state.online.role!=="host"||!state.online.roomMeta||state.online.roomMeta.players<2) return;
+  createMatch("online",[state.online.roomMeta.hostName,state.online.roomMeta.guestName||"Guest"]);
+  state.online.roomMeta.status="playing";
+  state.online.localHash=computeGameHash(state.game);
+  sendRoomMessage({type:"start-game",game:cloneSimple(state.game)});
+  startHeartbeat(); startTurnFlow(); queueRender();
+}
+
+function leaveToMenu(){
+  cleanupOnlineRuntime(false);
+  state.online.role="browser"; state.online.connectionStatus="offline";
+  state.online.roomMeta=null; state.online.localHash=""; state.online.remoteHash="";
+  clearInterval(runtime.turnInterval); clearTimeout(runtime.botTimer);
+  state.game=null; state.screen="menu"; state.ui.modal=null;
+  setRoomCodeInUrl(""); queueRender();
+}
+
+function copyRoomCode(){
+  const id=state.online.roomMeta&&state.online.roomMeta.roomId;
+  if(!id||!navigator.clipboard) return;
+  const url=`${window.location.origin}${window.location.pathname}?room=${id}`;
+  navigator.clipboard.writeText(url).then(()=>{showNotice("Enlace copiado al portapapeles.",false);}).catch(()=>showNotice("No se pudo copiar el enlace.",true));
+}
+function showNotice(msg,isErr){
+  state.ui.notice=msg; state.ui.noticeIsError=!!isErr; queueRender();
+  window.setTimeout(()=>{ state.ui.notice=""; queueRender(); },3000);
+}
+
+/* ════════════════════════════════════════════
+   UI HELPERS
+════════════════════════════════════════════ */
+function isLocalTurn(){
+  if(!state.game||state.game.phase!=="playing") return false;
+  if(state.game.mode==="bot") return state.game.activePlayer===0;
+  return state.game.activePlayer===getOnlineLocalPlayerIndex();
+}
+function canAdvanceRound(){
+  if(!state.game||state.game.phase!=="round-end") return false;
+  return state.game.mode!=="online"||state.online.role==="host";
+}
+
+/* ════════════════════════════════════════════
+   EVENT HANDLING
+════════════════════════════════════════════ */
+root.addEventListener("click", e=>{
+  const t=e.target.closest("[data-action]");
+  if(!t) return;
+  const action=t.dataset.action, ds=t.dataset;
+  switch(action){
+    case "start-bot":
+      localStorage.setItem("to.playerName",state.menu.playerName);
+      createMatch("bot",[state.menu.playerName||"Jugador","Mr. Saw Bot"]);
+      startTurnFlow(); queueRender(); break;
+    case "open-online": safeAsync(openOnlineBrowser); break;
+    case "back-menu":   leaveToMenu(); break;
+    case "refresh-rooms": safeAsync(refreshRooms); break;
+    case "open-create-room": state.ui.modal="create-room"; queueRender(); break;
+    case "close-modal": state.ui.modal=null; queueRender(); break;
+    case "save-peer-config": submitPeerConfig(); break;
+    case "join-room": safeAsync(()=>joinRoom(ds.roomId)); break;
+    case "join-by-code": safeAsync(()=>joinRoom(state.online.roomCodeInput)); break;
+    case "create-room-submit": safeAsync(createRoomFromModal); break;
+    case "leave-room": leaveRoomToBrowser(); break;
+    case "start-online-match": startHostedOnlineGame(); break;
+    case "copy-room-code": copyRoomCode(); break;
+    case "open-peer-config": state.ui.modal="peer-config"; queueRender(); break;
+    case "draw-card":
+    case "stay":
+    case "use-trump":
+    case "next-round":
+      if(action!=="next-round"&&!isLocalTurn()) return;
+      if(action==="next-round"&&!canAdvanceRound()) return;
+      handleGameButton(action,ds); break;
+  }
+});
+root.addEventListener("input", e=>{
+  const t=e.target;
+  if(!(t instanceof HTMLInputElement||t instanceof HTMLTextAreaElement||t instanceof HTMLSelectElement)) return;
+  if(t.id==="m-player-name"){ state.menu.playerName=t.value; }
+  else if(t.id==="m-online-name"){ state.menu.onlineName=t.value; localStorage.setItem("to.onlineName",t.value); }
+  else if(t.id==="join-code"){ state.online.roomCodeInput=t.value.toUpperCase(); }
+});
+window.addEventListener("beforeunload",()=>{ sendRoomMessage({type:"leave",reason:"window-close"}); cleanupOnlineRuntime(true); });
+
+function handleGameButton(action,ds){
+  if(!state.game) return;
+  const pi=state.game.mode==="online"?getOnlineLocalPlayerIndex():state.game.activePlayer;
+  if(action==="draw-card") performLocalGameAction(buildAction("draw-card",{playerIndex:pi}));
+  else if(action==="stay") performLocalGameAction(buildAction("stay",{playerIndex:pi}));
+  else if(action==="use-trump") performLocalGameAction(buildAction("play-trump",{playerIndex:pi,trumpIndex:Number(ds.trumpIndex)}));
+  else if(action==="next-round") performLocalGameAction(buildAction("next-round",{seed:generateSeed("round")}));
+}
+function submitPeerConfig(){
+  savePeerConfig({
+    host:(document.getElementById("pc-host")||{}).value||DEFAULT_PEER_HOST,
+    port:(document.getElementById("pc-port")||{}).value||DEFAULT_PEER_PORT,
+    path:(document.getElementById("pc-path")||{}).value||DEFAULT_PEER_PATH,
+    secure:((document.getElementById("pc-secure")||{}).value||"true")==="true",
+  });
+  state.ui.modal=null; cleanupOnlineRuntime(false); queueRender();
+}
+function safeAsync(task){ Promise.resolve().then(task).catch(err=>showNotice(String(err&&err.message?err.message:err),true)); }
+function queueRender(){ if(runtime.renderQueued) return; runtime.renderQueued=true; window.requestAnimationFrame(()=>{ runtime.renderQueued=false; render(); }); }
+
+/* ════════════════════════════════════════════
+   RENDER
+════════════════════════════════════════════ */
+function render(){ root.innerHTML=renderApp(); }
+
+function renderApp(){
+  return `<div id="shell">
+    ${renderTopbar()}
+    ${renderScreen()}
+    ${renderModal()}
+  </div>`;
+}
+
+function renderTopbar(){
+  const rm=state.online.roomMeta;
+  const connLabel=state.online.connectionStatus;
+  const isOnline=(connLabel==="connected"||connLabel==="synced"||connLabel==="hosting");
+  const onlineInfo=rm?`${esc(rm.roomName)} — ${rm.players}/2`
+    :state.online.peerStatus==="open"?`Peer: ${esc(state.online.peerId)}`
+    :"Sin conexión";
+  return `<header class="panel topbar">
+    <div class="brand-line">
+      <div class="brand-icon">21</div>
+      <div>
+        <div class="eyebrow">Mesa de Cartas</div>
+        <h1>Twenty One</h1>
+      </div>
+    </div>
+    <div class="nav-actions">
+      ${state.screen!=="menu"?`<span class="pill ${isOnline?"pill-ok":"pill-warn"}">${esc(onlineInfo)}</span>`:""}
+      ${state.screen!=="menu"?`<button class="btn-ghost" data-action="back-menu">← Menú</button>`:""}
+    </div>
+  </header>`;
+}
+
+function renderScreen(){
+  switch(state.screen){
+    case "online-browser": return renderBrowser();
+    case "online-lobby":   return renderLobby();
+    case "game":           return renderGame();
+    default:               return renderMenu();
+  }
+}
+
+/* ── MENU ── */
+function renderMenu(){
+  return `<section class="panel hero animate-in">
+    <div class="hero-copy">
+      <div class="eyebrow">Bienvenido a la mesa</div>
+      <h2>Llega primero al 21 — o róbale la vida al rival</h2>
+      <p>Cartas del 1 al 11, 25 poderes especiales y una sierra que avanza con cada derrota. El primero en quedarse sin distancia pierde la partida.</p>
+    </div>
+    <div class="field-row" style="max-width:600px">
+      <div class="field">
+        <label for="m-player-name">Tu nombre</label>
+        <input id="m-player-name" value="${esc(state.menu.playerName)}" placeholder="Jugador" />
+      </div>
+      <div class="field">
+        <label for="m-online-name">Nombre en partidas online</label>
+        <input id="m-online-name" value="${esc(state.menu.onlineName)}" placeholder="Jugador Online" />
+      </div>
+    </div>
+    <div class="mode-grid">
+      <article class="mode-card">
+        <div class="mode-card-icon bot">🤖</div>
+        <div class="eyebrow">Solo</div>
+        <h3>Contra el Bot</h3>
+        <p>IA heurística sin trampa. Usa información pública, toma decisiones estratégicas y juega con todos los trumps.</p>
+        <footer><button class="btn" data-action="start-bot">Jugar contra bot</button></footer>
+      </article>
+      <article class="mode-card">
+        <div class="mode-card-icon online">🌐</div>
+        <div class="eyebrow">Online P2P</div>
+        <h3>Multijugador Online</h3>
+        <p>Crea una sala o únete por código. Conexión directa entre navegadores vía PeerJS, sin servidor central para la partida.</p>
+        <footer>
+          <button class="btn" data-action="open-online">Abrir lobby</button>
+          <button class="btn-ghost" data-action="open-peer-config">⚙ Servidor</button>
+        </footer>
+      </article>
+    </div>
+    ${state.ui.notice?`<div class="${state.ui.noticeIsError?"err-bar":"notice-bar"}">${esc(state.ui.notice)}</div>`:""}
+  </section>`;
+}
+
+/* ── BROWSER ── */
+function renderBrowser(){
+  const rooms=state.online.roomList;
+  const roomHTML=rooms.length
+    ? rooms.map(r=>`<article class="room-card">
+        <div class="eyebrow">${esc(r.visibility==="public"?"Pública":"Privada")}</div>
+        <h3>${esc(r.roomName)}</h3>
+        <p>Host: <strong>${esc(r.hostName)}</strong></p>
+        <div class="chip-row">
+          <span class="chip chip-gold">${esc(r.roomId)}</span>
+          <span class="chip">${r.players}/2 jugadores</span>
+          <span class="chip">${esc(r.status==="lobby"?"En lobby":"Jugando")}</span>
+        </div>
+        <button class="btn" style="margin-top:4px" data-action="join-room" data-room-id="${esc(r.roomId)}">Unirse</button>
+      </article>`).join("")
+    : `<div class="empty-state">No hay salas públicas disponibles en este momento.</div>`;
+
+  const statusClass=state.online.peerStatus==="open"?"pill-ok":"pill-warn";
+  return `<section class="panel browser animate-in">
+    <div class="section-head">
+      <div class="eyebrow">Multijugador Online</div>
+      <h2>Lobby de Salas</h2>
+      <p class="muted">Crea una sala o únete con un código. La conexión es P2P directa.</p>
+    </div>
+    <div class="browser-top">
+      <div class="info-card">
+        <div class="eyebrow">Servidor PeerJS</div>
+        <h3>${esc(state.online.peerConfig.host)}</h3>
+        <p>Puerto ${esc(String(state.online.peerConfig.port))} · Path ${esc(state.online.peerConfig.path)}</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+          <span class="pill ${statusClass}">${esc(state.online.peerStatus)}</span>
+          <button class="btn-sm" data-action="open-peer-config">Editar</button>
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="eyebrow">Entrada rápida</div>
+        <h3>Unirse por código</h3>
+        <div class="field">
+          <label for="join-code">Código de sala</label>
+          <input id="join-code" value="${esc(state.online.roomCodeInput)}" placeholder="ROOM-ABC123" style="text-transform:uppercase" />
+        </div>
+        <button class="btn" style="margin-top:6px" data-action="join-by-code">Unirse</button>
+      </div>
+    </div>
+    ${state.online.discoveryError?`<div class="err-bar">${esc(state.online.discoveryError)}</div>`:""}
+    ${state.ui.notice?`<div class="${state.ui.noticeIsError?"err-bar":"notice-bar"}">${esc(state.ui.notice)}</div>`:""}
+    <div class="section-head">
+      <div class="eyebrow">Salas disponibles</div>
+    </div>
+    <div class="room-list">${roomHTML}</div>
+    <div class="browser-footer">
+      <button class="btn-ghost" data-action="refresh-rooms">${state.online.isRefreshing?"⟳ Cargando...":"⟳ Actualizar salas"}</button>
+      <button class="btn" data-action="open-create-room">+ Crear sala</button>
+      <span class="spacer"></span>
+      <span class="muted" style="font-size:13px">Peer: ${esc(state.online.peerId||"—")}</span>
+    </div>
+  </section>`;
+}
+
+/* ── LOBBY ── */
+function renderLobby(){
+  const rm=state.online.roomMeta;
+  if(!rm) return renderBrowser();
+  const statusClass=state.online.connectionStatus==="connected"||state.online.connectionStatus==="synced"?"pill-ok":"pill-warn";
+  return `<section class="panel lobby animate-in">
+    <div class="section-head">
+      <div class="eyebrow">Sala activa</div>
+      <h2>${esc(rm.roomName)}</h2>
+      <p class="muted">Código: <strong style="color:var(--gold)">${esc(rm.roomId)}</strong> · ${esc(rm.visibility==="public"?"Pública":"Privada")} · ${rm.players}/2 jugadores</p>
+    </div>
+    <div class="lobby-grid">
+      <div>
+        <div class="eyebrow" style="margin-bottom:10px">Jugadores</div>
+        <div style="display:grid;gap:10px">
+          <div class="slot-card filled">
+            <div class="eyebrow">Host</div>
+            <h3>${esc(rm.hostName)}</h3>
+            <span class="pill pill-ok">Conectado</span>
+          </div>
+          <div class="slot-card ${rm.players>=2?"filled":""}">
+            <div class="eyebrow">Invitado</div>
+            <h3>${rm.guestName?esc(rm.guestName):"Esperando jugador..."}</h3>
+            ${rm.players>=2?`<span class="pill pill-ok">Conectado</span>`:`<span class="pill pill-warn pulsing">Libre</span>`}
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:10px">Estado</div>
+        <div class="info-card">
+          <span class="pill ${statusClass}">${esc(state.online.connectionStatus)}</span>
+          <p>${state.online.role==="host"?"Cuando haya 2 jugadores, el host puede iniciar la partida.":"Esperando a que el host inicie la partida."}</p>
+          ${state.online.syncWarning?`<div class="notice-bar">${esc(state.online.syncWarning)}</div>`:""}
+        </div>
+        <div class="lobby-actions" style="margin-top:12px">
+          <button class="btn" data-action="copy-room-code">📋 Copiar enlace</button>
+          ${state.online.role==="host"?`<button class="btn-ghost" data-action="start-online-match" ${rm.players<2?"disabled":""}>Iniciar partida</button>`:""}
+          <button class="btn-danger" data-action="leave-room">Salir</button>
+        </div>
+      </div>
+    </div>
+    ${state.ui.notice?`<div class="${state.ui.noticeIsError?"err-bar":"notice-bar"}">${esc(state.ui.notice)}</div>`:""}
+  </section>`;
+}
+
+/* ── GAME ── */
+function renderGame(){
+  if(!state.game) return renderMenu();
+  const game=state.game, vi=getViewerIndex(), li=game.mode==="online"?getOnlineLocalPlayerIndex():vi;
+  const topIndex=otherPlayer(vi), botIndex=vi;
+  const target=getCurrentTarget(game), timerLeft=getTimeLeftMs(), timerPct=(timerLeft/TURN_TIME_MS)*100;
+  return `<section class="panel game-shell animate-in">
+    <div class="game-board">
+      <div class="table-col">
+        ${renderPlayerPanel(topIndex,vi,"rival")}
+        ${renderCenterPanel(target,timerPct)}
+        ${renderPlayerPanel(botIndex,vi,"tú")}
+        <div class="action-zone">
+          <div>
+            <div class="eyebrow">Acciones — ${esc(game.players[li].name)}</div>
+            <p class="muted" style="font-size:14px;margin-top:4px">${isLocalTurn()?"Tu turno: usa un trump, roba o plántate.":"Esperando la jugada del rival..."}</p>
+          </div>
+          <div class="action-buttons">
+            <button class="btn" data-action="draw-card" ${!isLocalTurn()?"disabled":""}>🎴 Robar carta</button>
+            <button class="btn-ghost" data-action="stay" ${!isLocalTurn()?"disabled":""}>✋ Plantarse</button>
+          </div>
+          <div class="trump-grid">${renderTrumpHand(li)}</div>
+        </div>
+      </div>
+      <aside class="log-panel">
+        <div class="eyebrow" style="margin-bottom:8px">Registro de jugadas</div>
+        <div class="log-scroll">
+          ${game.log.length
+            ? game.log.map(e=>`<div class="log-entry">${esc(e)}</div>`).join("")
+            : `<div class="muted" style="font-style:italic;padding:10px">El registro aparecerá aquí.</div>`}
+        </div>
+        ${game.mode==="online"?`<div style="margin-top:12px">
+          <span class="pill ${state.online.connectionStatus==="synced"||state.online.connectionStatus==="connected"?"pill-ok":"pill-warn"}">${esc(state.online.connectionStatus)}</span>
+          ${state.online.syncWarning?`<div class="notice-bar" style="margin-top:8px;font-size:13px">${esc(state.online.syncWarning)}</div>`:""}
+        </div>`:""}
+      </aside>
+    </div>
+  </section>
+  ${game.result?renderResultOverlay(game.result,target):""}`;
+}
+
+function renderPlayerPanel(pi,vi,label){
+  const game=state.game, player=game.players[pi];
+  const target=getCurrentTarget(game), total=getHandTotal(game,pi);
+  const visTotal=getVisibleTotal(game,pi,vi), rev=game.phase!=="playing";
+  const active=game.phase==="playing"&&game.activePlayer===pi;
+  const showAll=rev||vi===pi;
+  const displayTotal=showAll?total:`${visTotal}+?`;
+  const over=showAll&&total>target;
+  const trumps=game.placedTrumps.filter(t=>t.ownerIndex===pi);
+  const badges=[];
+  if(player.stayed) badges.push("Plantado");
+  if(player.timedOut) badges.push("Timeout");
+  if(showAll&&over) badges.push("¡Pasado!");
+  return `<div class="player-panel ${active?"active":"waiting"}">
+    <div class="player-header">
+      <div class="player-info">
+        <div class="eyebrow">${esc(label)}</div>
+        <h3>${esc(player.name)}</h3>
+        <div class="player-stats" style="margin-top:6px">
+          <span class="stat-tag">Distancia: ${player.sawDistance}</span>
+          <span class="stat-tag ${getBetPressure(game,pi)>0?"danger":""}">Peligro: ${getBetPressure(game,pi)}</span>
+          ${badges.map(b=>`<span class="stat-tag danger">${esc(b)}</span>`).join("")}
+        </div>
+      </div>
+      <div class="player-total ${over?"over":""}">${displayTotal}</div>
+    </div>
+    <div class="hand-row">
+      ${player.hand.length
+        ? player.hand.map(c=>renderCard(c,pi,vi,showAll)).join("")
+        : `<span class="empty-hand">Sin cartas</span>`}
+    </div>
+    ${trumps.length?`<div class="placed-trumps">${trumps.map(t=>`<span class="trump-chip">${esc(TRUMP_LIBRARY[t.id].name)}</span>`).join("")}</div>`:""}
+  </div>`;
+}
+
+function renderCard(card,ownerIndex,vi,reveal){
+  const hidden=!reveal&&ownerIndex!==vi&&card.hiddenFromOpponent;
+  if(hidden){
+    return `<div class="card-el hidden-card">
+      <div class="card-corner-top">OCULTA</div>
+      <div class="card-value hidden-val">?</div>
+      <div class="card-corner-bot">${esc(card.source)}</div>
+    </div>`;
+  }
+  return `<div class="card-el ${card.hiddenFromOpponent&&!reveal?"hidden-card":""}">
+    <div class="card-corner-top">${card.hiddenFromOpponent?`~${esc(card.source)}`:esc(card.source)}</div>
+    <div class="card-value">${esc(String(card.value))}</div>
+    <div class="card-corner-bot">${card.hiddenFromOpponent?"⚫ Oculta":"◉ Visible"}</div>
+  </div>`;
+}
+
+function renderTrumpHand(pi){
+  const trumps=state.game.players[pi].trumps;
+  if(!trumps.length) return `<div class="empty-state" style="padding:20px 14px;font-size:14px">No quedan trumps en tu mano.</div>`;
+  return trumps.map((tid,i)=>{
+    const t=TRUMP_LIBRARY[tid];
+    return `<div class="trump-card">
+      <div class="trump-family">${esc(t.family)} · ${t.mode==="persistent"?"persistente":"instante"}</div>
+      <h4>${esc(t.name)}</h4>
+      <p>${esc(t.description)}</p>
+      <button class="btn-sm" data-action="use-trump" data-trump-index="${i}" ${!isLocalTurn()?"disabled":""} style="margin-top:4px">Usar</button>
+    </div>`;
+  }).join("");
+}
+
+function renderCenterPanel(target,timerPct){
+  const game=state.game;
+  const p0=game.players[0],p1=game.players[1];
+  const total=Math.max(1,p0.sawDistance+p1.sawDistance);
+  const sawPos=(p0.sawDistance/total)*100;
+  const lFill=((START_DISTANCE-p0.sawDistance)/START_DISTANCE)*50;
+  const rFill=((START_DISTANCE-p1.sawDistance)/START_DISTANCE)*50;
+  return `<div class="center-panel">
+    <div class="saw-section">
+      <div class="eyebrow">Sierra — ${esc(p0.name)} vs ${esc(p1.name)}</div>
+      <div class="saw-labels">
+        <span style="color:var(--red2)">${p0.sawDistance} 💀</span>
+        <span style="color:var(--green2)">💀 ${p1.sawDistance}</span>
+      </div>
+      <div class="saw-track">
+        <div class="saw-fill-l" style="width:${lFill}%"></div>
+        <div class="saw-fill-r" style="width:${rFill}%"></div>
+        <div class="saw-blade" style="left:${sawPos}%"></div>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-lbl">Objetivo</div><div class="metric-val">${target}</div></div>
+      <div class="metric"><div class="metric-lbl">Apuesta base</div><div class="metric-val">${game.baseBet}</div></div>
+      <div class="metric"><div class="metric-lbl">Ronda</div><div class="metric-val">${game.roundNumber}</div></div>
+      <div class="metric"><div class="metric-lbl">Mazo</div><div class="metric-val">${game.deck.length}</div></div>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:5px">Tiempo restante</div>
+      <div class="timer-bar"><div class="timer-fill" style="width:${timerPct}%"></div></div>
+    </div>
+  </div>`;
+}
+
+function renderResultOverlay(result,target){
+  const game=state.game;
+  const isMatchEnd=game.phase==="match-end";
+  const winnerName=result.winnerIndex!==null?game.players[result.winnerIndex].name:"Empate";
+  const loserName=result.loserIndex!==null?game.players[result.loserIndex].name:"—";
+  const t0=result.totals[0],t1=result.totals[1];
+  return `<div class="overlay">
+    <article class="result-card animate-in">
+      <div class="eyebrow">${isMatchEnd?"Partida terminada":"Fin de ronda"}</div>
+      <h3>${esc(result.winnerIndex===null?"¡Empate!":"¡"+winnerName+" gana!")}</h3>
+      <div class="result-value">${result.winnerIndex===null?"—":`${esc(loserName)} −${result.damage}`}</div>
+      <p class="muted">Objetivo: <strong>${target}</strong> · Totales: <strong>${t0}</strong> vs <strong>${t1}</strong></p>
+      <p class="muted" style="font-size:14px">Razón: ${esc(result.reason)}</p>
+      ${result.blessSaved?`<p style="color:var(--gold);font-style:italic">✨ La Bendición evitó un golpe letal.</p>`:""}
+      <div class="modal-actions" style="justify-content:center">
+        ${!isMatchEnd&&canAdvanceRound()?`<button class="btn" data-action="next-round">Siguiente ronda →</button>`:""}
+        ${!isMatchEnd&&!canAdvanceRound()?`<span class="pill pill-warn">Esperando al host...</span>`:""}
+        <button class="btn-ghost" data-action="back-menu">Volver al menú</button>
+      </div>
+    </article>
+  </div>`;
+}
+
+/* ── MODALS ── */
+function renderModal(){
+  if(state.ui.modal==="create-room"){
+    return `<div class="modal-bg">
+      <article class="modal-card animate-in">
+        <div class="eyebrow">Crear sala</div>
+        <h3>Nueva sala de juego</h3>
+        <div class="field">
+          <label for="cr-name">Nombre de la sala</label>
+          <input id="cr-name" value="Mesa de ${esc(state.menu.onlineName||"Host")}" />
+        </div>
+        <div class="field">
+          <label for="cr-player">Tu nombre</label>
+          <input id="cr-player" value="${esc(state.menu.onlineName)}" />
+        </div>
+        <div class="field">
+          <label for="cr-vis">Visibilidad</label>
+          <select id="cr-vis">
+            <option value="public">Pública (aparece en el lobby)</option>
+            <option value="private">Privada (solo por código)</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" data-action="create-room-submit">Crear sala</button>
+          <button class="btn-ghost" data-action="close-modal">Cancelar</button>
+        </div>
+      </article>
+    </div>`;
+  }
+  if(state.ui.modal==="peer-config"){
+    const c=state.online.peerConfig;
+    return `<div class="modal-bg">
+      <article class="modal-card animate-in">
+        <div class="eyebrow">Configuración del servidor</div>
+        <h3>PeerJS Server</h3>
+        <p class="muted" style="font-size:14px">Por defecto se usa el servidor público gratuito de PeerJS (0.peerjs.com). Solo cambia esto si tienes tu propio servidor.</p>
+        <div class="field">
+          <label for="pc-host">Host</label>
+          <input id="pc-host" value="${esc(c.host)}" placeholder="0.peerjs.com" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="pc-port">Puerto</label>
+            <input id="pc-port" value="${esc(String(c.port))}" placeholder="443" />
+          </div>
+          <div class="field">
+            <label for="pc-path">Path</label>
+            <input id="pc-path" value="${esc(c.path)}" placeholder="/" />
+          </div>
+          <div class="field">
+            <label for="pc-secure">Seguro (HTTPS)</label>
+            <select id="pc-secure">
+              <option value="true" ${c.secure?"selected":""}>Sí (HTTPS)</option>
+              <option value="false" ${!c.secure?"selected":""}>No (HTTP)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" data-action="save-peer-config">Guardar</button>
+          <button class="btn-ghost" data-action="close-modal">Cancelar</button>
+        </div>
+      </article>
+    </div>`;
+  }
+  return "";
+}
+
+/* ════════════════════════════════════════════
+   BOOT
+════════════════════════════════════════════ */
+(function boot(){
+  state.online.roomCodeInput=getRoomCodeFromUrl()||"";
+  render();
+  if(state.online.roomCodeInput){
+    state.screen="online-browser"; render();
+    queueMicrotask(()=>{
+      if(!runtime.autoJoinAttempted){
+        runtime.autoJoinAttempted=true;
+        safeAsync(openOnlineBrowser);
+      }
+    });
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
