@@ -354,7 +354,7 @@
     .stat-badge.danger { background: rgba(192,57,43,0.25); color: #f1948a; border-color: rgba(192,57,43,0.3); }
     .hand-total {
       font-family: var(--font-head);
-      font-size: 32px;
+      font-size: 22px;
       font-weight: 900;
       color: #fff;
       text-shadow: 0 2px 10px rgba(0,0,0,0.7);
@@ -363,7 +363,7 @@
       background: rgba(0,0,0,0.4);
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.12);
-      min-width: 70px;
+      min-width: 80px;
       text-align: center;
     }
     .hand-total.over {
@@ -507,8 +507,68 @@
       font-weight: 900;
       color: rgba(255,255,255,0.25);
       letter-spacing: 0.15em;
+    }
+    .score-vs-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
       flex-shrink: 0;
-      padding: 0 4px;
+      padding: 0 6px;
+    }
+    .score-bet-badge {
+      font-family: var(--font-head);
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--gold);
+      text-shadow: 0 0 12px rgba(212,175,95,0.5);
+    }
+    .score-bet-lbl {
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+    }
+    .score-life-label {
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+      margin-top: 1px;
+    }
+
+    /* ── TURN BANNER ──────────────────── */
+    .turn-banner {
+      position: fixed; inset: 0; z-index: 60;
+      display: grid; place-items: center;
+      pointer-events: none;
+      animation: fadeIn 0.2s ease;
+    }
+    .turn-banner-card {
+      background: rgba(10,12,15,0.92);
+      border: 2px solid var(--border2);
+      border-radius: 24px;
+      padding: 28px 48px;
+      text-align: center;
+      display: grid; gap: 8px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 0 1px rgba(212,175,95,0.1);
+      animation: turnPop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .turn-banner-icon { font-size: 36px; }
+    .turn-banner-name {
+      font-family: var(--font-head);
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--gold);
+    }
+    .turn-banner-sub {
+      font-size: 14px;
+      color: var(--text2);
+      letter-spacing: 0.05em;
+    }
+    @keyframes turnPop {
+      from { opacity:0; transform: scale(0.8) translateY(10px); }
+      to   { opacity:1; transform: scale(1) translateY(0); }
     }
     .table-metrics {
       display: flex;
@@ -825,7 +885,7 @@
    CONSTANTS & CONFIG
 ════════════════════════════════════════════ */
 const APP_VERSION   = "2.0.0";
-const START_DISTANCE = 5;
+const START_DISTANCE = 10;
 const START_BET      = 1;
 const TURN_TIME_MS   = 35000;
 const MAX_LOG        = 20;
@@ -893,6 +953,8 @@ const runtime = {
   reconnectTimer: null,
   processedRemoteActions: new Set(),
   autoJoinAttempted: false,
+  showTurnBanner: false,
+  turnBannerTimer: null,
 };
 
 const DEFAULT_PEER_HOST = "0.peerjs.com";
@@ -1059,7 +1121,7 @@ function prepareRound(game,seed){
   game.trumpDeck=shuffleWithSeed(TRUMP_IDS,`${seed}:trump`);
   game.placedTrumps=[]; game.actionSeq=0; game.result=null;
   game.activePlayer=(game.roundNumber-1)%2;
-  game.players.forEach(p=>{ p.hand=[]; p.trumps=[]; p.stayed=false; p.timedOut=false; });
+  game.players.forEach(p=>{ p.hand=[]; p.stayed=false; p.timedOut=false; }); // trumps se mantienen acumulativos
   for(let pi=0;pi<game.players.length;pi++){
     drawNumberCard(game,pi,{hiddenFromOpponent:false,source:"inicial-visible",recentEligible:true});
     drawNumberCard(game,pi,{hiddenFromOpponent:true,source:"inicial-oculta",recentEligible:false});
@@ -1099,6 +1161,7 @@ function resolveRound(game){
     damage=getBetPressure(game,loserIndex);
     if(hasBless(game,loserIndex)&&damage>=game.players[loserIndex].sawDistance&&game.players[loserIndex].sawDistance>0){blessSaved=true;damage=0;}
     game.players[loserIndex].sawDistance=Math.max(0,game.players[loserIndex].sawDistance-damage);
+    game.players[winnerIndex].sawDistance+=damage; // ganador absorbe la apuesta como vida
     if(game.players[loserIndex].sawDistance<=0) matchWinnerIndex=winnerIndex;
   }
   game.baseBet=blessSaved?Math.max(0,game.baseBet-1):game.baseBet+1;
@@ -1137,6 +1200,7 @@ function applyAction(game,action){
   if(action.type==="draw-card"){
     const card=drawNumberCard(game,actor,{hiddenFromOpponent:false,source:"draw"});
     pushLog(game,card?`${player.name} robó ${card.value}.`:`${player.name} intentó robar, pero el mazo estaba vacío.`);
+    if(card && consumeRandom(game)<0.10){ drawTrump(game,actor,1,"robo especial (10%)"); }
     advanceTurn(game,actor); return true;
   }
   if(action.type==="stay"){
@@ -1170,6 +1234,12 @@ function startTurnFlow(){
   if(!state.game||state.game.phase!=="playing"){ queueRender(); return; }
   runtime.turnActivePlayer=state.game.activePlayer;
   runtime.turnDeadline=Date.now()+TURN_TIME_MS;
+
+  // Banner de turno
+  clearTimeout(runtime.turnBannerTimer);
+  runtime.showTurnBanner=true;
+  runtime.turnBannerTimer=window.setTimeout(()=>{ runtime.showTurnBanner=false; queueRender(); },2000);
+
   runtime.turnInterval=window.setInterval(()=>{
     if(!state.game||state.game.phase!=="playing"){ clearInterval(runtime.turnInterval); runtime.turnInterval=null; return; }
     if(isTimerAuthority()&&runtime.turnActivePlayer===state.game.activePlayer&&Date.now()>=runtime.turnDeadline){
@@ -1840,7 +1910,22 @@ function renderGame(){
       </aside>
     </div>
   </div>
-  ${game.result?renderResultOverlay(game.result,target):""}`;
+  ${game.result?renderResultOverlay(game.result,target):""}
+  ${(!game.result&&runtime.showTurnBanner)?renderTurnBanner(game):""}`;
+}
+
+function renderTurnBanner(game){
+  const vi=getViewerIndex();
+  const active=game.activePlayer;
+  const isLocal=active===vi;
+  const playerName=game.players[active].name;
+  return `<div class="turn-banner">
+    <div class="turn-banner-card">
+      <div class="turn-banner-icon">${isLocal?"🟢":"⏳"}</div>
+      <div class="turn-banner-name">${isLocal?"¡Tu turno!":esc(playerName)}</div>
+      <div class="turn-banner-sub">${isLocal?"Roba, plántate o usa un trump":"Está pensando su jugada…"}</div>
+    </div>
+  </div>`;
 }
 
 function renderPlayerZone(pi,vi,label,game){
@@ -1849,7 +1934,7 @@ function renderPlayerZone(pi,vi,label,game){
   const visTotal=getVisibleTotal(game,pi,vi), rev=game.phase!=="playing";
   const active=game.phase==="playing"&&game.activePlayer===pi;
   const showAll=rev||vi===pi;
-  const displayTotal=showAll?total:`${visTotal}+?`;
+  const displayTotal=showAll?`${total}/${target}`:`${visTotal}+?/${target}`;
   const over=showAll&&total>target;
   const trumps=game.placedTrumps.filter(t=>t.ownerIndex===pi);
   const badges=[];
@@ -1916,31 +2001,29 @@ function renderTrumpHand(pi){
 
 function renderTableCenter(target,timerPct,game){
   const p0=game.players[0],p1=game.players[1];
-  const maxDist=START_DISTANCE;
-  function heartsHtml(dist){
-    let h="";
-    for(let i=0;i<maxDist;i++) h+=`<div class="heart-dot ${i<dist?"full":"empty"}"></div>`;
-    return h;
-  }
-  const s0Class=p0.sawDistance<=1?"score-low":p0.sawDistance<=2?"":"score-ok";
-  const s1Class=p1.sawDistance<=1?"score-low":p1.sawDistance<=2?"":"score-ok";
+  const bet=game.baseBet;
+  const s0Class=p0.sawDistance<=3?"score-low":p0.sawDistance>=10?"score-ok":"";
+  const s1Class=p1.sawDistance<=3?"score-low":p1.sawDistance>=10?"score-ok":"";
   return `<div class="table-center-band">
     <div class="scoreboard">
       <div class="score-side">
-        <div class="score-number ${s0Class}" style="color:${p0.sawDistance<=1?"var(--red2)":p0.sawDistance>=4?"var(--green2)":"#fff"}">${p0.sawDistance}</div>
-        <div class="score-hearts">${heartsHtml(p0.sawDistance)}</div>
+        <div class="score-number ${s0Class}" style="color:${p0.sawDistance<=3?"var(--red2)":p0.sawDistance>=10?"var(--green2)":"#fff"}">${p0.sawDistance}</div>
+        <div class="score-life-label">fichas</div>
         <div class="score-name">${esc(p0.name)}</div>
       </div>
-      <div class="score-vs">VS</div>
+      <div class="score-vs-col">
+        <div class="score-vs">VS</div>
+        <div class="score-bet-badge">🪙 ${bet}</div>
+        <div class="score-bet-lbl">apuesta</div>
+      </div>
       <div class="score-side">
-        <div class="score-number" style="color:${p1.sawDistance<=1?"var(--red2)":p1.sawDistance>=4?"var(--green2)":"#fff"}">${p1.sawDistance}</div>
-        <div class="score-hearts">${heartsHtml(p1.sawDistance)}</div>
+        <div class="score-number ${s1Class}" style="color:${p1.sawDistance<=3?"var(--red2)":p1.sawDistance>=10?"var(--green2)":"#fff"}">${p1.sawDistance}</div>
+        <div class="score-life-label">fichas</div>
         <div class="score-name">${esc(p1.name)}</div>
       </div>
     </div>
     <div class="table-metrics">
       <div class="tmetric"><div class="tmetric-val">${target}</div><div class="tmetric-lbl">Objetivo</div></div>
-      <div class="tmetric"><div class="tmetric-val">${game.baseBet}</div><div class="tmetric-lbl">Apuesta</div></div>
       <div class="tmetric"><div class="tmetric-val">${game.roundNumber}</div><div class="tmetric-lbl">Ronda</div></div>
       <div class="tmetric"><div class="tmetric-val">${game.deck.length}</div><div class="tmetric-lbl">Mazo</div></div>
     </div>
