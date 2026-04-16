@@ -11,13 +11,17 @@
   <style>
     :root {
       --bg:        #0a0c0f;
-      --felt:      #0d1a14;
-      --felt2:     #111f18;
-      --panel:     rgba(14,18,24,0.92);
-      --panel2:    rgba(20,26,34,0.85);
-      --glass:     rgba(255,255,255,0.04);
-      --border:    rgba(255,255,255,0.08);
-      --border2:   rgba(212,175,95,0.2);
+      --felt:      #1a6b2e;
+      --felt2:     #155724;
+      --felt-dark: #0d3d18;
+      --wood:      #5c3317;
+      --wood2:     #7a4520;
+      --panel:     rgba(14,18,24,0.95);
+      --panel2:    rgba(20,26,34,0.88);
+      --glass:     rgba(0,0,0,0.35);
+      --glass2:    rgba(255,255,255,0.05);
+      --border:    rgba(255,255,255,0.1);
+      --border2:   rgba(212,175,95,0.3);
       --gold:      #d4af5f;
       --gold2:     #f0d080;
       --gold-dim:  #8a6e30;
@@ -44,18 +48,17 @@
     }
     body {
       background:
-        radial-gradient(ellipse 80% 40% at 50% 0%, rgba(212,175,95,0.07) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 60% at 80% 100%, rgba(27,70,42,0.15) 0%, transparent 50%),
+        radial-gradient(ellipse 80% 40% at 50% 0%, rgba(212,175,95,0.06) 0%, transparent 60%),
         linear-gradient(180deg, #0a0c0f 0%, #0d1017 100%);
       min-height: 100vh;
-      padding: 20px;
+      padding: 16px;
     }
     button, input, select { font-family: var(--font-body); font-size: inherit; }
     button { cursor: pointer; border: none; }
     a { color: inherit; }
 
     /* ── LAYOUT ────────────────────────── */
-    #app { max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+    #app { max-width: 1400px; margin: 0 auto; display: grid; gap: 14px; }
 
     /* ── PANELS ────────────────────────── */
     .panel {
@@ -104,11 +107,11 @@
     }
     .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(212,175,95,0.45); }
     .btn-ghost {
-      background: rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.08);
       color: var(--text);
       border: 1px solid var(--border);
     }
-    .btn-ghost:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.13); transform: translateY(-1px); }
     .btn-danger {
       background: linear-gradient(135deg, #e74c3c, #922b21);
       color: white;
@@ -117,18 +120,18 @@
     .btn-sm {
       padding: 7px 16px;
       font-size: 13px;
-      background: rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.08);
       color: var(--text);
       border: 1px solid var(--border);
     }
-    .btn-sm:hover { background: rgba(255,255,255,0.12); }
-    button:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+    .btn-sm:hover { background: rgba(255,255,255,0.13); }
+    button:disabled { opacity: 0.32; cursor: not-allowed; transform: none !important; }
 
     /* ── INPUTS ────────────────────────── */
     input, select {
       width: 100%;
       padding: 10px 14px;
-      background: rgba(0,0,0,0.3);
+      background: rgba(0,0,0,0.35);
       border: 1px solid var(--border);
       border-radius: 10px;
       color: var(--text);
@@ -143,17 +146,16 @@
     /* ── TOPBAR ────────────────────────── */
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 16px; padding: 18px 28px;
-      border-bottom: 1px solid var(--border);
+      gap: 16px; padding: 16px 24px;
       border-radius: var(--r);
     }
-    .brand-line { display: flex; align-items: center; gap: 16px; }
+    .brand-line { display: flex; align-items: center; gap: 14px; }
     .brand-icon {
-      width: 48px; height: 48px;
+      width: 44px; height: 44px;
       background: linear-gradient(135deg, var(--gold), #8a6020);
-      border-radius: 12px;
+      border-radius: 10px;
       display: grid; place-items: center;
-      font-family: var(--font-head); font-size: 22px; color: #0a0800; font-weight: 900;
+      font-family: var(--font-head); font-size: 20px; color: #0a0800; font-weight: 900;
       flex-shrink: 0;
     }
     .nav-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -245,186 +247,493 @@
     .slot-card h3 { font-size: 18px; }
     .lobby-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
-    /* ── GAME SCREEN ───────────────────── */
-    .game-shell { padding: 20px; display: grid; gap: 18px; }
-    .game-board { display: grid; grid-template-columns: 1fr 300px; gap: 18px; }
-    .table-col { display: grid; gap: 16px; }
+    /* ════════════════════════════════════
+       GAME SCREEN — MESA 2D
+    ════════════════════════════════════ */
+    .game-shell {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 14px;
+      min-height: calc(100vh - 100px);
+    }
 
-    /* ── PLAYER PANEL ──────────────────── */
-    .player-panel {
-      background: linear-gradient(160deg, rgba(255,255,255,0.03), rgba(0,0,0,0.2));
-      border: 1px solid var(--border);
+    /* ── FELT TABLE ──────────────────── */
+    .felt-table {
+      background: linear-gradient(170deg, #1e7a34 0%, #155c27 40%, #0f3d19 100%);
+      border: 10px solid var(--wood);
+      border-radius: 28px;
+      box-shadow:
+        inset 0 0 80px rgba(0,0,0,0.4),
+        inset 0 0 30px rgba(0,0,0,0.3),
+        0 0 0 3px var(--wood2),
+        0 16px 60px rgba(0,0,0,0.7);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .felt-table::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.008) 40px, rgba(255,255,255,0.008) 80px),
+        repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(255,255,255,0.006) 40px, rgba(255,255,255,0.006) 80px);
+      pointer-events: none;
+    }
+
+    /* ── PLAYER ZONES ────────────────── */
+    .player-zone {
+      flex: 1;
+      padding: 18px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      min-height: 0;
+    }
+    .player-zone.rival-zone {
+      border-bottom: 2px dashed rgba(255,255,255,0.08);
+    }
+    .player-zone.my-zone {
+      border-top: 2px dashed rgba(255,255,255,0.08);
+    }
+
+    /* Zone active glow */
+    .player-zone.zone-active::after {
+      content: '';
+      position: absolute; inset: 0;
       border-radius: 18px;
-      padding: 20px;
-      display: grid; gap: 14px;
-      transition: border-color 0.3s, box-shadow 0.3s;
+      box-shadow: inset 0 0 30px rgba(212,175,95,0.12);
+      pointer-events: none;
     }
-    .player-panel.active {
-      border-color: rgba(212,175,95,0.4);
-      box-shadow: 0 0 40px rgba(212,175,95,0.08), inset 0 0 0 1px rgba(212,175,95,0.15);
+
+    /* ── ZONE HEADER ─────────────────── */
+    .zone-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
     }
-    .player-panel.waiting { opacity: 0.7; }
-    .player-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-    .player-info { display: grid; gap: 4px; }
-    .player-info h3 { font-size: 20px; }
-    .player-stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .zone-player-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .zone-avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.4);
+      border: 2px solid rgba(255,255,255,0.15);
+      display: grid; place-items: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .zone-avatar.active-av { border-color: var(--gold); box-shadow: 0 0 14px rgba(212,175,95,0.5); }
+    .zone-name {
+      font-family: var(--font-head);
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    }
+    .zone-label-tag {
+      font-family: var(--font-head);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+    }
+    .zone-stat-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .stat-badge {
+      padding: 3px 8px; border-radius: 999px;
+      font-size: 11px;
+      background: rgba(0,0,0,0.35);
+      color: rgba(255,255,255,0.65);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .stat-badge.danger { background: rgba(192,57,43,0.25); color: #f1948a; border-color: rgba(192,57,43,0.3); }
+    .hand-total {
+      font-family: var(--font-head);
+      font-size: 32px;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+      line-height: 1;
+      padding: 6px 14px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      min-width: 70px;
+      text-align: center;
+    }
+    .hand-total.over {
+      color: var(--red2);
+      border-color: rgba(231,76,60,0.4);
+      text-shadow: 0 0 16px rgba(231,76,60,0.5);
+    }
+
+    /* ── CARDS ON FELT ───────────────── */
+    .hand-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .card-el {
+      width: 76px;
+      height: 110px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: linear-gradient(160deg, #f5f0e8 0%, #ede5d0 100%);
+      padding: 7px 8px;
+      display: grid;
+      align-content: space-between;
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3);
+      cursor: default;
+    }
+    .card-el:hover { transform: translateY(-6px) rotate(-1deg); box-shadow: 0 14px 28px rgba(0,0,0,0.6); }
+    .card-el.hidden-card {
+      background: linear-gradient(160deg, #2a1f4a, #1a1230);
+      border-color: rgba(150,100,220,0.35);
+    }
+    .card-el.busted-card { border-color: rgba(192,57,43,0.5); }
+    .card-corner-top {
+      font-size: 10px;
+      color: #444;
+      font-family: var(--font-head);
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+    .card-el.hidden-card .card-corner-top { color: rgba(180,150,255,0.6); }
+    .card-value {
+      font-family: var(--font-head);
+      font-size: 38px;
+      font-weight: 900;
+      color: #111;
+      text-align: center;
+      line-height: 1;
+    }
+    .card-value.hidden-val { color: rgba(160,110,255,0.8); font-size: 30px; }
+    .card-corner-bot {
+      font-size: 10px;
+      color: #444;
+      text-align: right;
+      font-family: var(--font-head);
+      letter-spacing: 0.03em;
+      font-weight: 700;
+    }
+    .card-el.hidden-card .card-corner-bot { color: rgba(180,150,255,0.5); }
+    .empty-hand {
+      color: rgba(255,255,255,0.3);
+      font-style: italic;
+      font-size: 14px;
+      padding: 20px 0;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    /* ── PLACED TRUMPS ON TABLE ──────── */
+    .placed-trumps { display: flex; gap: 6px; flex-wrap: wrap; }
+    .trump-chip {
+      padding: 3px 10px; border-radius: 999px;
+      background: rgba(212,175,95,0.15);
+      border: 1px solid rgba(212,175,95,0.3);
+      font-size: 11px; color: var(--gold);
+      font-family: var(--font-head); letter-spacing: 0.04em;
+    }
+
+    /* ── SCOREBOARD (center of table) ── */
+    .table-center-band {
+      background: rgba(0,0,0,0.55);
+      border-top: 1px solid rgba(255,255,255,0.07);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      padding: 12px 22px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .scoreboard {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+    .score-side {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+    }
+    .score-number {
+      font-family: var(--font-head);
+      font-size: 42px;
+      font-weight: 900;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+      transition: color 0.4s;
+    }
+    .score-number.score-low { color: var(--red2); text-shadow: 0 0 20px rgba(231,76,60,0.6); }
+    .score-number.score-ok  { color: var(--green2); text-shadow: 0 0 16px rgba(46,204,113,0.5); }
+    .score-hearts {
+      display: flex;
+      gap: 3px;
+    }
+    .heart-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      transition: background 0.4s, box-shadow 0.4s;
+    }
+    .heart-dot.full  { background: var(--red2); box-shadow: 0 0 6px rgba(231,76,60,0.6); }
+    .heart-dot.empty { background: rgba(255,255,255,0.15); }
+    .score-name {
+      font-family: var(--font-head);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .score-vs {
+      font-family: var(--font-head);
+      font-size: 14px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.25);
+      letter-spacing: 0.15em;
+      flex-shrink: 0;
+      padding: 0 4px;
+    }
+    .table-metrics {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .tmetric {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+    }
+    .tmetric-val {
+      font-family: var(--font-head);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gold);
+    }
+    .tmetric-lbl {
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+    }
+    .timer-bar {
+      height: 5px; border-radius: 999px;
+      background: rgba(255,255,255,0.1);
+      overflow: hidden;
+      flex: 1;
+      min-width: 60px;
+    }
+    .timer-fill {
+      height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, var(--green2), var(--gold), var(--red2));
+      transition: width 0.25s linear;
+    }
+    .timer-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 80px;
+    }
+    .timer-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── SIDE PANEL ──────────────────── */
+    .side-panel {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    /* ── ACTION ZONE ─────────────────── */
+    .action-zone {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+    .action-header { display: flex; flex-direction: column; gap: 4px; }
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .action-buttons .btn, .action-buttons .btn-ghost {
+      justify-content: center;
+      padding: 12px 10px;
+      font-size: 14px;
+    }
+
+    /* ── TRUMP HAND ──────────────────── */
+    .trump-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+    .trump-scroll {
+      max-height: 240px;
+      overflow-y: auto;
+      display: grid;
+      gap: 8px;
+      padding-right: 2px;
+    }
+    .trump-scroll::-webkit-scrollbar { width: 3px; }
+    .trump-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+    .trump-card {
+      background: rgba(212,175,95,0.07);
+      border: 1px solid rgba(212,175,95,0.18);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: grid; gap: 4px;
+    }
+    .trump-card h4 {
+      font-family: var(--font-head);
+      font-size: 13px;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    .trump-card p { font-size: 12px; color: var(--text2); line-height: 1.35; }
+    .trump-family { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 2px; }
+    .trump-card-actions { margin-top: 4px; }
+
+    /* ── LOG ───────────────────────────── */
+    .log-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 16px;
+      display: grid; gap: 10px;
+      align-content: start;
+    }
+    .log-scroll { max-height: 200px; overflow-y: auto; display: grid; gap: 6px; padding-right: 2px; }
+    .log-scroll::-webkit-scrollbar { width: 3px; }
+    .log-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+    .log-entry {
+      padding: 6px 10px;
+      border-left: 2px solid rgba(212,175,95,0.25);
+      font-size: 13px; color: var(--text2);
+      line-height: 1.35;
+    }
+    .log-entry:first-child { color: var(--text); border-left-color: var(--gold-dim); }
+
+    /* ── STAT TAGS (old compat) ──────── */
     .stat-tag {
       padding: 4px 10px; border-radius: 999px;
       background: rgba(255,255,255,0.06);
       font-size: 12px; color: var(--text2);
     }
     .stat-tag.danger { background: rgba(192,57,43,0.15); color: #f1948a; }
-    .player-total {
+
+    /* ── OVERLAY / MODAL ───────────────── */
+    .overlay, .modal-bg {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(5,7,10,0.82);
+      display: grid; place-items: center;
+      padding: 20px;
+      backdrop-filter: blur(6px);
+    }
+    .modal-card, .result-card {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: 24px;
+      padding: 32px;
+      width: min(580px, 100%);
+      display: grid; gap: 18px;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+    }
+    .modal-card h3, .result-card h3 { font-family: var(--font-head); font-size: 26px; }
+    .result-card { text-align: center; }
+    .result-value {
       font-family: var(--font-head);
-      font-size: 38px;
-      font-weight: 900;
+      font-size: 48px; font-weight: 900;
       color: var(--gold);
-      text-shadow: 0 0 30px rgba(212,175,95,0.4);
-      line-height: 1;
+      text-shadow: 0 0 40px rgba(212,175,95,0.5);
     }
-    .player-total.over { color: var(--red2); text-shadow: 0 0 20px rgba(231,76,60,0.4); }
+    .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
-    /* ── CARDS ─────────────────────────── */
-    .hand-row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .card-el {
-      width: 80px;
-      min-height: 118px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.1);
-      background: linear-gradient(160deg, #1c2030, #0f1218);
-      padding: 10px;
-      display: grid;
-      align-content: space-between;
-      position: relative;
-      transition: transform 0.2s, box-shadow 0.2s;
-      flex-shrink: 0;
-    }
-    .card-el:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.5); }
-    .card-el.hidden-card {
-      background: linear-gradient(160deg, #1a1428, #0e0c18);
-      border-color: rgba(150,100,200,0.2);
-    }
-    .card-el.busted-card { border-color: rgba(192,57,43,0.4); }
-    .card-corner-top { font-size: 11px; color: var(--text2); font-family: var(--font-head); letter-spacing: 0.05em; }
-    .card-value {
-      font-family: var(--font-head);
-      font-size: 34px;
-      font-weight: 900;
-      color: var(--text);
+    /* ── PASS OVERLAY ──────────────────── */
+    .pass-card {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: 24px;
+      padding: 40px 32px;
+      width: min(480px, 100%);
       text-align: center;
-      line-height: 1;
+      display: grid; gap: 20px;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.9);
     }
-    .card-value.hidden-val { color: rgba(150,100,200,0.7); font-size: 28px; }
-    .card-corner-bot { font-size: 11px; color: var(--text2); text-align: right; font-family: var(--font-head); letter-spacing: 0.03em; }
-    .empty-hand { color: var(--text2); font-style: italic; padding: 10px 0; font-size: 15px; }
+    .pass-icon { font-size: 48px; }
 
-    /* ── TRUMPS ROW ────────────────────── */
-    .placed-trumps { display: flex; gap: 8px; flex-wrap: wrap; min-height: 20px; }
-    .trump-chip {
-      padding: 4px 12px; border-radius: 999px;
+    /* ── NOTICE ────────────────────────── */
+    .notice-bar {
+      padding: 10px 18px; border-radius: 10px;
       background: rgba(212,175,95,0.1);
       border: 1px solid rgba(212,175,95,0.2);
-      font-size: 12px; color: var(--gold);
-      font-family: var(--font-head); letter-spacing: 0.04em;
+      color: var(--gold);
+      font-size: 14px;
+    }
+    .err-bar {
+      padding: 10px 18px; border-radius: 10px;
+      background: rgba(192,57,43,0.1);
+      border: 1px solid rgba(192,57,43,0.2);
+      color: #f1948a;
+      font-size: 14px;
     }
 
-    /* ── CENTER PANEL ──────────────────── */
-    .center-panel {
-      background: var(--glass);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 18px;
-      display: grid; gap: 14px;
+    /* ── SECTION TITLE ─────────────────── */
+    .section-head { display: grid; gap: 6px; }
+    .section-head h2 { font-size: 22px; }
+    .section-head p { color: var(--text2); font-size: 15px; }
+
+    /* ── RESPONSIVE ────────────────────── */
+    @media (max-width: 960px) {
+      .game-shell { grid-template-columns: 1fr; }
+      .felt-table { min-height: 500px; }
     }
-    .saw-section { display: grid; gap: 8px; }
-    .saw-labels { display: flex; justify-content: space-between; font-size: 13px; }
-    .saw-track {
-      position: relative;
-            height: 14px; border-radius: 999px;
-      background: rgba(255,255,255,0.07);
-      overflow: visible;
-    }
-    .saw-fill-l {
-      position: absolute; top:0; left:0; bottom:0; border-radius: 999px 0 0 999px;
-      background: linear-gradient(90deg, rgba(192,57,43,0.7), rgba(192,57,43,0.3));
-      transition: width 0.5s;
-    }
-    .saw-fill-r {
-      position: absolute; top:0; right:0; bottom:0; border-radius: 0 999px 999px 0;
-      background: linear-gradient(270deg, rgba(39,174,96,0.7), rgba(39,174,96,0.3));
-      transition: width 0.5s;
-    }
-    .saw-blade {
-      position: absolute; top: 50%; width: 20px; height: 20px;
-      background: white; border-radius: 50%;
-      transform: translate(-50%, -50%);
-      box-shadow: 0 0 16px rgba(255,255,255,0.7);
-      transition: left 0.5s;
-      z-index: 2;
-    }
-    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .metric {
-      background: rgba(0,0,0,0.2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      display: grid; gap: 2px;
-    }
-    .metric-val { font-family: var(--font-head); font-size: 24px; color: var(--gold); font-weight: 700; }
-    .metric-lbl { font-size: 11px; color: var(--text2); letter-spacing: 0.06em; text-transform: uppercase; }
-    .timer-bar {
-      height: 6px; border-radius: 999px;
-      background: rgba(255,255,255,0.08);
-      overflow: hidden;
-    }
-    .timer-fill {
-      height: 100%; border-radius: 999px;
-      background: linear-gradient(90deg, var(--gold), var(--red2));
-      transition: width 0.25s linear;
+    @media (max-width: 600px) {
+      body { padding: 10px; }
+      .hero { padding: 22px 16px; }
+      .score-number { font-size: 32px; }
+      .action-buttons { grid-template-columns: 1fr; }
     }
 
-    /* ── ACTION ZONE ───────────────────── */
-    .action-zone {
-      background: var(--glass);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 20px;
-      display: grid; gap: 14px;
-    }
-    .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
-    .trump-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 10px; }
-    .trump-card {
-      background: rgba(0,0,0,0.2);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px;
-      display: grid; gap: 8px;
-      transition: border-color 0.2s;
-    }
-    .trump-card:hover { border-color: var(--border2); }
-    .trump-card h4 { font-family: var(--font-head); font-size: 14px; color: var(--gold); }
-    .trump-card p { font-size: 13px; color: var(--text2); line-height: 1.4; }
-    .trump-family { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
-
-    /* ── LOG ───────────────────────────── */
-    .log-panel {
-      background: var(--glass);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 20px;
-      display: grid; gap: 12px;
-      align-content: start;
-    }
-    .log-scroll { max-height: 380px; overflow-y: auto; display: grid; gap: 8px; padding-right: 4px; }
-    .log-scroll::-webkit-scrollbar { width: 4px; }
-    .log-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-    .log-entry {
-      padding: 7px 12px;
-      border-left: 2px solid rgba(212,175,95,0.3);
-      font-size: 14px; color: var(--text2);
-      line-height: 1.4;
-    }
-    .log-entry:first-child { color: var(--text); border-left-color: var(--gold-dim); }
+    /* ── ANIMATIONS ────────────────────── */
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .animate-in { animation: fadeIn 0.3s ease; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+    .pulsing { animation: pulse 2s ease infinite; }
+    @keyframes cardDeal { from { opacity:0; transform:translateY(-20px) scale(0.9); } to { opacity:1; transform:translateY(0) scale(1); } }
+    .card-el { animation: cardDeal 0.25s ease backwards; }
 
     /* ── OVERLAY / MODAL ───────────────── */
     .overlay, .modal-bg {
@@ -495,7 +804,7 @@
     @media (max-width: 600px) {
       body { padding: 12px; }
       .hero { padding: 24px 18px; }
-      .game-shell { padding: 12px; }
+      .felt-table { border-radius: 18px; border-width: 6px; }
       .metrics { grid-template-columns: 1fr 1fr; }
     }
 
@@ -1170,8 +1479,7 @@ root.addEventListener("click", e=>{
 root.addEventListener("input", e=>{
   const t=e.target;
   if(!(t instanceof HTMLInputElement||t instanceof HTMLTextAreaElement||t instanceof HTMLSelectElement)) return;
-  if(t.id==="m-player-name"){ state.menu.playerName=t.value; }
-  else if(t.id==="m-online-name"){ state.menu.onlineName=t.value; localStorage.setItem("to.onlineName",t.value); }
+  if(t.id==="m-player-name"){ state.menu.playerName=t.value; state.menu.onlineName=t.value; localStorage.setItem("to.playerName",t.value); localStorage.setItem("to.onlineName",t.value); }
   else if(t.id==="join-code"){ state.online.roomCodeInput=parseRoomFields(t.value).roomCode; }
 });
 window.addEventListener("beforeunload",()=>{ sendRoomMessage({type:"leave",reason:"window-close"}); cleanupOnlineRuntime(true); });
@@ -1377,16 +1685,12 @@ function renderMenu(){
     <div class="hero-copy">
       <div class="eyebrow">Bienvenido a la mesa</div>
       <h2>Llega primero al 21 — o róbale la vida al rival</h2>
-      <p>Cartas del 1 al 11, 25 poderes especiales y una sierra que avanza con cada derrota. El primero en quedarse sin distancia pierde la partida.</p>
+      <p>Cartas del 1 al 11, 25 poderes especiales y vidas que se pierden con cada derrota. El primero en quedarse sin vidas pierde la partida.</p>
     </div>
-    <div class="field-row" style="max-width:600px">
+    <div style="max-width:320px">
       <div class="field">
-        <label for="m-player-name">Tu nombre</label>
+        <label for="m-player-name">Tu nombre (local y online)</label>
         <input id="m-player-name" value="${esc(state.menu.playerName)}" placeholder="Jugador" />
-      </div>
-      <div class="field">
-        <label for="m-online-name">Nombre en partidas online</label>
-        <input id="m-online-name" value="${esc(state.menu.onlineName)}" placeholder="Jugador Online" />
       </div>
     </div>
     <div class="mode-grid">
@@ -1500,43 +1804,47 @@ function renderGame(){
   const game=state.game, vi=getViewerIndex(), li=game.mode==="online"?getOnlineLocalPlayerIndex():vi;
   const topIndex=otherPlayer(vi), botIndex=vi;
   const target=getCurrentTarget(game), timerPct=(getTimeLeftMs()/TURN_TIME_MS)*100;
-  return `<section class="panel game-shell${onceAnimateClass("game-shell")}">
-    <div class="game-board">
-      <div class="table-col">
-        ${renderPlayerPanel(topIndex,vi,"rival")}
-        ${renderCenterPanel(target,timerPct)}
-        ${renderPlayerPanel(botIndex,vi,"tú")}
-        <div class="action-zone">
-          <div>
-            <div class="eyebrow" data-ui="action-player">Acciones — ${esc(game.players[li].name)}</div>
-            <p class="muted" data-ui="turn-label" style="font-size:14px;margin-top:4px">${isLocalTurn()?"Tu turno: usa un trump, roba o plántate.":"Esperando la jugada del rival..."}</p>
-          </div>
-          <div class="action-buttons">
-            <button class="btn" data-action="draw-card" ${!isLocalTurn()?"disabled":""}>🎴 Robar carta</button>
-            <button class="btn-ghost" data-action="stay" ${!isLocalTurn()?"disabled":""}>✋ Plantarse</button>
-          </div>
-          <div class="trump-grid">${renderTrumpHand(li)}</div>
+  const p0=game.players[0], p1=game.players[1];
+  return `<div class="game-shell${onceAnimateClass("game-shell")}">
+    <div class="felt-table">
+      ${renderPlayerZone(topIndex,vi,"rival",game)}
+      ${renderTableCenter(target,timerPct,game)}
+      ${renderPlayerZone(botIndex,vi,"tú",game)}
+    </div>
+    <div class="side-panel">
+      <div class="action-zone">
+        <div class="action-header">
+          <div class="eyebrow" data-ui="action-player">Acciones — ${esc(game.players[li].name)}</div>
+          <p class="muted" data-ui="turn-label" style="font-size:13px;margin-top:2px">${isLocalTurn()?"🟢 Tu turno: roba, plántate o usa un trump.":"⏳ Esperando la jugada del rival..."}</p>
+        </div>
+        <div class="action-buttons">
+          <button class="btn" data-action="draw-card" ${!isLocalTurn()?"disabled":""}>🎴 Robar carta</button>
+          <button class="btn-ghost" data-action="stay" ${!isLocalTurn()?"disabled":""}>✋ Plantarse</button>
         </div>
       </div>
+      <div class="trump-section">
+        <div class="eyebrow" style="margin-bottom:4px">Tus trumps (${game.players[li].trumps.length})</div>
+        <div class="trump-scroll">${renderTrumpHand(li)}</div>
+      </div>
       <aside class="log-panel">
-        <div class="eyebrow" style="margin-bottom:8px">Registro de jugadas</div>
+        <div class="eyebrow" style="margin-bottom:6px">Registro</div>
         <div class="log-scroll" data-ui="log-scroll">
           ${game.log.length
             ? game.log.map(e=>`<div class="log-entry">${esc(e)}</div>`).join("")
-            : `<div class="muted" style="font-style:italic;padding:10px">El registro aparecerá aquí.</div>`}
+            : `<div class="muted" style="font-style:italic;padding:8px;font-size:14px">El registro aparecerá aquí.</div>`}
         </div>
-        ${game.mode==="online"?`<div style="margin-top:12px">
+        ${game.mode==="online"?`<div style="margin-top:8px">
           <span class="pill ${state.online.connectionStatus==="synced"||state.online.connectionStatus==="connected"?"pill-ok":"pill-warn"}" data-ui="game-conn-pill">${esc(state.online.connectionStatus)}</span>
-          ${state.online.syncWarning?`<div class="notice-bar" style="margin-top:8px;font-size:13px">${esc(state.online.syncWarning)}</div>`:""}
+          ${state.online.syncWarning?`<div class="notice-bar" style="margin-top:6px;font-size:12px">${esc(state.online.syncWarning)}</div>`:""}
         </div>`:""}
       </aside>
     </div>
-  </section>
+  </div>
   ${game.result?renderResultOverlay(game.result,target):""}`;
 }
 
-function renderPlayerPanel(pi,vi,label){
-  const game=state.game, player=game.players[pi];
+function renderPlayerZone(pi,vi,label,game){
+  const player=game.players[pi];
   const target=getCurrentTarget(game), total=getHandTotal(game,pi);
   const visTotal=getVisibleTotal(game,pi,vi), rev=game.phase!=="playing";
   const active=game.phase==="playing"&&game.activePlayer===pi;
@@ -1545,89 +1853,99 @@ function renderPlayerPanel(pi,vi,label){
   const over=showAll&&total>target;
   const trumps=game.placedTrumps.filter(t=>t.ownerIndex===pi);
   const badges=[];
-  if(player.stayed) badges.push("Plantado");
-  if(player.timedOut) badges.push("Timeout");
-  if(showAll&&over) badges.push("¡Pasado!");
-  return `<div class="player-panel ${active?"active":"waiting"}">
-    <div class="player-header">
-      <div class="player-info">
-        <div class="eyebrow">${esc(label)}</div>
-        <h3>${esc(player.name)}</h3>
-        <div class="player-stats" style="margin-top:6px">
-          <span class="stat-tag">Distancia: ${player.sawDistance}</span>
-          <span class="stat-tag ${getBetPressure(game,pi)>0?"danger":""}">Peligro: ${getBetPressure(game,pi)}</span>
-          ${badges.map(b=>`<span class="stat-tag danger">${esc(b)}</span>`).join("")}
+  if(player.stayed) badges.push("✋ Plantado");
+  if(player.timedOut) badges.push("⏱ Timeout");
+  if(showAll&&over) badges.push("💥 ¡Pasado!");
+  const isRival=label==="rival";
+  return `<div class="player-zone ${isRival?"rival-zone":"my-zone"} ${active?"zone-active":""}">
+    <div class="zone-header">
+      <div class="zone-player-info">
+        <div class="zone-avatar ${active?"active-av":""}">${isRival?"🤖":"👤"}</div>
+        <div>
+          <div class="zone-name">${esc(player.name)}</div>
+          <div class="zone-label-tag">${isRival?"Rival":"Tu zona"}</div>
         </div>
       </div>
-      <div class="player-total ${over?"over":""}">${displayTotal}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="zone-stat-row">
+          ${badges.map(b=>`<span class="stat-badge danger">${esc(b)}</span>`).join("")}
+          ${getBetPressure(game,pi)>0?`<span class="stat-badge danger">⚠️ Peligro: ${getBetPressure(game,pi)}</span>`:""}
+        </div>
+        <div class="hand-total ${over?"over":""}">${displayTotal}</div>
+      </div>
     </div>
     <div class="hand-row">
       ${player.hand.length
-        ? player.hand.map(c=>renderCard(c,pi,vi,showAll)).join("")
-        : `<span class="empty-hand">Sin cartas</span>`}
+        ? player.hand.map((c,idx)=>renderCard(c,pi,vi,showAll,idx)).join("")
+        : `<span class="empty-hand">Sin cartas aún…</span>`}
     </div>
-    ${trumps.length?`<div class="placed-trumps">${trumps.map(t=>`<span class="trump-chip">${esc(TRUMP_LIBRARY[t.id].name)}</span>`).join("")}</div>`:""}
+    ${trumps.length?`<div class="placed-trumps">${trumps.map(t=>`<span class="trump-chip">⚡ ${esc(TRUMP_LIBRARY[t.id].name)}</span>`).join("")}</div>`:""}
   </div>`;
 }
 
-function renderCard(card,ownerIndex,vi,reveal){
+function renderCard(card,ownerIndex,vi,reveal,idx){
   const hidden=!reveal&&ownerIndex!==vi&&card.hiddenFromOpponent;
+  const delay=`animation-delay:${(idx||0)*0.06}s`;
   if(hidden){
-    return `<div class="card-el hidden-card">
-      <div class="card-corner-top">OCULTA</div>
+    return `<div class="card-el hidden-card" style="${delay}">
+      <div class="card-corner-top">?</div>
       <div class="card-value hidden-val">?</div>
-      <div class="card-corner-bot">${esc(card.source)}</div>
+      <div class="card-corner-bot">Oculta</div>
     </div>`;
   }
-  return `<div class="card-el ${card.hiddenFromOpponent&&!reveal?"hidden-card":""}">
+  return `<div class="card-el" style="${delay}">
     <div class="card-corner-top">${card.hiddenFromOpponent?`~${esc(card.source)}`:esc(card.source)}</div>
     <div class="card-value">${esc(String(card.value))}</div>
-    <div class="card-corner-bot">${card.hiddenFromOpponent?"⚫ Oculta":"◉ Visible"}</div>
+    <div class="card-corner-bot">${card.hiddenFromOpponent?"⚫":"◉"}</div>
   </div>`;
 }
 
 function renderTrumpHand(pi){
   const trumps=state.game.players[pi].trumps;
-  if(!trumps.length) return `<div class="empty-state" style="padding:20px 14px;font-size:14px">No quedan trumps en tu mano.</div>`;
+  if(!trumps.length) return `<div style="color:var(--text2);font-style:italic;font-size:13px;padding:8px 0">No tienes trumps en mano.</div>`;
   return trumps.map((tid,i)=>{
     const t=TRUMP_LIBRARY[tid];
     return `<div class="trump-card">
       <div class="trump-family">${esc(t.family)} · ${t.mode==="persistent"?"persistente":"instante"}</div>
       <h4>${esc(t.name)}</h4>
       <p>${esc(t.description)}</p>
-      <button class="btn-sm" data-action="use-trump" data-trump-index="${i}" ${!isLocalTurn()?"disabled":""} style="margin-top:4px">Usar</button>
+      <div class="trump-card-actions"><button class="btn-sm" data-action="use-trump" data-trump-index="${i}" ${!isLocalTurn()?"disabled":""}>Usar</button></div>
     </div>`;
   }).join("");
 }
 
-function renderCenterPanel(target,timerPct){
-  const game=state.game;
+function renderTableCenter(target,timerPct,game){
   const p0=game.players[0],p1=game.players[1];
-  const total=Math.max(1,p0.sawDistance+p1.sawDistance);
-  const sawPos=(p0.sawDistance/total)*100;
-  const lFill=((START_DISTANCE-p0.sawDistance)/START_DISTANCE)*50;
-  const rFill=((START_DISTANCE-p1.sawDistance)/START_DISTANCE)*50;
-  return `<div class="center-panel">
-    <div class="saw-section">
-      <div class="eyebrow">Sierra — ${esc(p0.name)} vs ${esc(p1.name)}</div>
-      <div class="saw-labels">
-        <span style="color:var(--red2)">${p0.sawDistance} 💀</span>
-        <span style="color:var(--green2)">💀 ${p1.sawDistance}</span>
+  const maxDist=START_DISTANCE;
+  function heartsHtml(dist){
+    let h="";
+    for(let i=0;i<maxDist;i++) h+=`<div class="heart-dot ${i<dist?"full":"empty"}"></div>`;
+    return h;
+  }
+  const s0Class=p0.sawDistance<=1?"score-low":p0.sawDistance<=2?"":"score-ok";
+  const s1Class=p1.sawDistance<=1?"score-low":p1.sawDistance<=2?"":"score-ok";
+  return `<div class="table-center-band">
+    <div class="scoreboard">
+      <div class="score-side">
+        <div class="score-number ${s0Class}" style="color:${p0.sawDistance<=1?"var(--red2)":p0.sawDistance>=4?"var(--green2)":"#fff"}">${p0.sawDistance}</div>
+        <div class="score-hearts">${heartsHtml(p0.sawDistance)}</div>
+        <div class="score-name">${esc(p0.name)}</div>
       </div>
-      <div class="saw-track">
-        <div class="saw-fill-l" style="width:${lFill}%"></div>
-        <div class="saw-fill-r" style="width:${rFill}%"></div>
-        <div class="saw-blade" style="left:${sawPos}%"></div>
+      <div class="score-vs">VS</div>
+      <div class="score-side">
+        <div class="score-number" style="color:${p1.sawDistance<=1?"var(--red2)":p1.sawDistance>=4?"var(--green2)":"#fff"}">${p1.sawDistance}</div>
+        <div class="score-hearts">${heartsHtml(p1.sawDistance)}</div>
+        <div class="score-name">${esc(p1.name)}</div>
       </div>
     </div>
-    <div class="metrics">
-      <div class="metric"><div class="metric-lbl">Objetivo</div><div class="metric-val">${target}</div></div>
-      <div class="metric"><div class="metric-lbl">Apuesta base</div><div class="metric-val">${game.baseBet}</div></div>
-      <div class="metric"><div class="metric-lbl">Ronda</div><div class="metric-val">${game.roundNumber}</div></div>
-      <div class="metric"><div class="metric-lbl">Mazo</div><div class="metric-val">${game.deck.length}</div></div>
+    <div class="table-metrics">
+      <div class="tmetric"><div class="tmetric-val">${target}</div><div class="tmetric-lbl">Objetivo</div></div>
+      <div class="tmetric"><div class="tmetric-val">${game.baseBet}</div><div class="tmetric-lbl">Apuesta</div></div>
+      <div class="tmetric"><div class="tmetric-val">${game.roundNumber}</div><div class="tmetric-lbl">Ronda</div></div>
+      <div class="tmetric"><div class="tmetric-val">${game.deck.length}</div><div class="tmetric-lbl">Mazo</div></div>
     </div>
-    <div>
-      <div class="eyebrow" style="margin-bottom:5px">Tiempo restante <span data-ui="timer-label">${Math.ceil(getTimeLeftMs()/1000)}s</span></div>
+    <div class="timer-wrap">
+      <div class="timer-label-row"><span>⏱ Tiempo</span><span data-ui="timer-label">${Math.ceil(getTimeLeftMs()/1000)}s</span></div>
       <div class="timer-bar"><div class="timer-fill" data-ui="timer-fill" style="width:${timerPct}%"></div></div>
     </div>
   </div>`;
