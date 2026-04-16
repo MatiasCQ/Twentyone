@@ -660,6 +660,57 @@
       color: rgba(255,255,255,0.4);
     }
 
+    /* ── TRUMP MODAL ────────────────── */
+    .trump-modal-bg {
+      position: fixed; inset: 0; z-index: 80;
+      background: rgba(0,0,0,0.75);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+      animation: fadeIn 0.15s ease;
+    }
+    .trump-modal {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: 22px;
+      padding: 24px;
+      width: 100%; max-width: 720px;
+      max-height: 85vh;
+      overflow-y: auto;
+      display: grid; gap: 20px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.8);
+      animation: turnPop 0.2s cubic-bezier(0.34,1.4,0.64,1);
+    }
+    .trump-modal-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .trump-modal-head h3 { font-size: 20px; color: var(--gold); }
+    .trump-category { display: grid; gap: 10px; }
+    .trump-category-title {
+      font-family: var(--font-head);
+      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--gold-dim);
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .trump-category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px,1fr));
+      gap: 8px;
+    }
+    .trump-card-modal {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: grid; gap: 5px;
+      transition: border-color 0.15s;
+    }
+    .trump-card-modal:hover { border-color: var(--border2); }
+    .trump-card-modal h4 { font-size: 14px; color: var(--text); }
+    .trump-card-modal p  { font-size: 12px; color: var(--text2); line-height: 1.4; }
+    .trump-card-modal .trump-family { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+
     /* ── SIDE PANEL ──────────────────── */
     .side-panel {
       display: grid;
@@ -970,6 +1021,13 @@ const TRUMP_LIBRARY = {
   disservice:     makeTrump("disservice","Mal Servicio","instant","Mazo","Fuerza al rival a robar una carta visible."),
 };
 
+const UI_TRUMP_CATEGORIES = [
+  { key:"puntaje", label:"Puntaje / Objetivo",   ids:["go17","go24","go27","one-up","two-up","bloodshed"] },
+  { key:"rival",   label:"Contra el Rival",       ids:["destroy","reincarnation","disservice","remove","exchange"] },
+  { key:"carta",   label:"Carta",                 ids:["2-card","3-card","4-card","5-card","6-card","7-card","hush","perfect-draw","refresh","return"] },
+  { key:"parami",  label:"Para Mí",               ids:["shield","shield-plus","bless","friendship"] },
+];
+
 /* ════════════════════════════════════════════
    RUNTIME & STATE
 ════════════════════════════════════════════ */
@@ -1235,7 +1293,14 @@ function applyAction(game,action){
   if(action.type==="play-trump"){
     const tid=player.trumps.splice(action.trumpIndex,1)[0];
     if(!tid) return false;
-    applyTrump(game,actor,tid); return true;
+    applyTrump(game,actor,tid);
+    // Si el rival estaba plantado, darle turno de reacción tras el trump
+    const ei=otherPlayer(actor);
+    if(game.players[ei].stayed){
+      game.players[ei].stayed=false;
+      pushLog(game,`${game.players[ei].name} puede reaccionar al trump de ${player.name}.`);
+    }
+    return true;
   }
   if(action.type==="draw-card"){
     const card=drawNumberCard(game,actor,{hiddenFromOpponent:false,source:"draw"});
@@ -1628,6 +1693,8 @@ root.addEventListener("click", e=>{
     case "open-salas-rapidas": state.screen="salas-rapidas"; state.online.joiningRapida=0; queueRender(); break;
     case "join-sala-rapida": safeAsync(()=>joinSalaRapida(Number(t.dataset.sala))); break;
     case "back-menu":   leaveToMenu(); break;
+    case "open-trump-modal": state.ui.modal="trump-hand"; queueRender(); break;
+    case "close-trump-modal": if(t.tagName==="BUTTON"||!e.target.closest(".trump-modal")){ state.ui.modal=null; queueRender(); } break;
     case "open-create-room": state.ui.modal="create-room"; queueRender(); break;
     case "close-modal": state.ui.modal=null; queueRender(); break;
     case "join-by-code": safeAsync(()=>joinRoom(state.online.roomCodeInput)); break;
@@ -1657,7 +1724,7 @@ function handleGameButton(action,ds){
   const pi=state.game.mode==="online"?getOnlineLocalPlayerIndex():state.game.activePlayer;
   if(action==="draw-card") performLocalGameAction(buildAction("draw-card",{playerIndex:pi}));
   else if(action==="stay") performLocalGameAction(buildAction("stay",{playerIndex:pi}));
-  else if(action==="use-trump") performLocalGameAction(buildAction("play-trump",{playerIndex:pi,trumpIndex:Number(ds.trumpIndex)}));
+  else if(action==="use-trump"){ performLocalGameAction(buildAction("play-trump",{playerIndex:pi,trumpIndex:Number(ds.trumpIndex)})); if(state.ui.modal==="trump-hand") state.ui.modal=null; }
   else if(action==="next-round") performLocalGameAction(buildAction("next-round",{seed:generateSeed("round")}));
 }
 function safeAsync(task){ Promise.resolve().then(task).catch(err=>showNotice(String(err&&err.message?err.message:err),true)); }
@@ -2033,7 +2100,10 @@ function renderGame(){
         </div>
       </div>
       <div class="trump-section">
-        <div class="eyebrow" style="margin-bottom:4px">Tus trumps (${game.players[li].trumps.length})</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div class="eyebrow">Tus trumps (${game.players[li].trumps.length})</div>
+          ${game.players[li].trumps.length?`<button class="btn-sm" style="padding:4px 10px;font-size:11px" data-action="open-trump-modal">Ver todos</button>`:""}
+        </div>
         <div class="trump-scroll">${renderTrumpHand(li)}</div>
       </div>
       <aside class="log-panel">
@@ -2198,7 +2268,42 @@ function renderResultOverlay(result,target){
 }
 
 /* ── MODALS ── */
+function renderTrumpModal(){
+  if(!state.game) return "";
+  const li=state.game.mode==="online"?getOnlineLocalPlayerIndex():getViewerIndex();
+  const hand=state.game.players[li].trumps;
+  const canUse=isLocalTurn();
+  const sections=UI_TRUMP_CATEGORIES.map(cat=>{
+    const present=hand.map((tid,i)=>({tid,i})).filter(({tid})=>cat.ids.includes(tid));
+    if(!present.length) return "";
+    return `<div class="trump-category">
+      <div class="trump-category-title">${esc(cat.label)}</div>
+      <div class="trump-category-grid">
+        ${present.map(({tid,i})=>{
+          const t=TRUMP_LIBRARY[tid];
+          return `<div class="trump-card-modal">
+            <div class="trump-family">${esc(t.family)} · ${t.mode==="persistent"?"persistente":"instante"}</div>
+            <h4>${esc(t.name)}</h4>
+            <p>${esc(t.description)}</p>
+            <div style="margin-top:6px"><button class="btn-sm" data-action="use-trump" data-trump-index="${i}" ${!canUse?"disabled":""}>Usar</button></div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+  }).join("");
+  return `<div class="trump-modal-bg" data-action="close-trump-modal">
+    <div class="trump-modal">
+      <div class="trump-modal-head">
+        <h3>Tus Trumps (${hand.length})</h3>
+        <button class="btn-ghost" style="padding:7px 16px;font-size:13px" data-action="close-trump-modal">✕ Cerrar</button>
+      </div>
+      ${sections||`<div class="muted" style="font-style:italic">No tienes trumps en mano.</div>`}
+    </div>
+  </div>`;
+}
+
 function renderModal(){
+  if(state.ui.modal==="trump-hand") return renderTrumpModal();
   if(state.ui.modal==="create-room"){
     return `<div class="modal-bg">
       <article class="modal-card animate-in">
