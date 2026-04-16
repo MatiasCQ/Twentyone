@@ -233,6 +233,37 @@
       font-style: italic; font-size: 16px;
     }
 
+    /* ── SALAS RÁPIDAS ──────────────────── */
+    .salas-rapidas { padding: 28px; display: grid; gap: 22px; }
+    .sala-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 14px; }
+    .sala-card {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px 16px;
+      display: grid; gap: 10px;
+      text-align: center;
+      transition: border-color 0.2s, transform 0.2s;
+      cursor: pointer;
+    }
+    .sala-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+    .sala-card.sala-joining { border-color: var(--border2); opacity: 0.7; pointer-events: none; }
+    .sala-number {
+      font-family: var(--font-head);
+      font-size: 48px;
+      font-weight: 900;
+      color: var(--gold);
+      line-height: 1;
+    }
+    .sala-label {
+      font-family: var(--font-head);
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+    }
+    .sala-hint { font-size: 13px; color: var(--text2); }
+
     /* ── LOBBY ─────────────────────────── */
     .lobby { padding: 28px; display: grid; gap: 22px; }
     .lobby-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -542,7 +573,13 @@
       position: fixed; inset: 0; z-index: 60;
       display: grid; place-items: center;
       pointer-events: none;
-      animation: fadeIn 0.2s ease;
+      animation: turnBannerLife 1.4s ease forwards;
+    }
+    @keyframes turnBannerLife {
+      0%   { opacity: 0; }
+      15%  { opacity: 1; }
+      65%  { opacity: 1; }
+      100% { opacity: 0; }
     }
     .turn-banner-card {
       background: rgba(10,12,15,0.92);
@@ -885,6 +922,8 @@
    CONSTANTS & CONFIG
 ════════════════════════════════════════════ */
 const APP_VERSION   = "2.0.0";
+const SALA_RAPIDA_COUNT  = 7;
+const SALA_RAPIDA_PREFIX = "twone-sala-v2-";
 const START_DISTANCE = 10;
 const START_BET      = 1;
 const TURN_TIME_MS   = 35000;
@@ -986,6 +1025,7 @@ const state = {
     remoteHash: "",
     syncWarning: "",
     reconnectAttempts: 0,
+    joiningRapida: 0,
   },
 };
 
@@ -1238,7 +1278,7 @@ function startTurnFlow(){
   // Banner de turno
   clearTimeout(runtime.turnBannerTimer);
   runtime.showTurnBanner=true;
-  runtime.turnBannerTimer=window.setTimeout(()=>{ runtime.showTurnBanner=false; queueRender(); },2000);
+  runtime.turnBannerTimer=window.setTimeout(()=>{ runtime.showTurnBanner=false; queueRender(); },1400);
 
   runtime.turnInterval=window.setInterval(()=>{
     if(!state.game||state.game.phase!=="playing"){ clearInterval(runtime.turnInterval); runtime.turnInterval=null; return; }
@@ -1466,6 +1506,62 @@ function cleanupOnlineRuntime(skipDestroy){
   if(!skipDestroy&&runtime.peer){ try{runtime.peer.destroy();}catch(e){} runtime.peer=null; state.online.peerId=""; state.online.peerStatus="idle"; }
 }
 
+async function joinSalaRapida(num){
+  const peerId=`${SALA_RAPIDA_PREFIX}${num}`;
+  const playerName=state.menu.playerName||"Jugador";
+  localStorage.setItem("to.playerName",playerName);
+  cleanupOnlineRuntime(false);
+  state.online.peerStatus="connecting"; state.online.peerError="";
+  state.online.joiningRapida=num; state.screen="salas-rapidas";
+  queueRender();
+
+  // Intentar registrar el ID fijo → si lo logra, eres host; si está ocupado, eres guest
+  const becameHost=await new Promise(resolve=>{
+    const peer=new window.Peer(peerId,getPeerOptions());
+    runtime.peer=peer; runtime.peerKind="room";
+    peer.on("open",id=>{ state.online.peerStatus="open"; state.online.peerId=id; wirePeerEvents(peer); resolve(true); });
+    peer.on("error",()=>{ try{peer.destroy();}catch(e){} runtime.peer=null; state.online.peerStatus="idle"; resolve(false); });
+  });
+
+  if(becameHost){
+    state.online.role="host"; state.online.connectionStatus="hosting";
+    state.online.roomMeta={roomId:peerId,roomCode:peerId,roomName:`Sala ${num}`,hostPeerId:peerId,hostName:playerName,guestName:"",players:1,status:"lobby",createdAt:new Date().toISOString(),version:APP_VERSION};
+    state.online.roomCodeInput=peerId;
+    state.screen="online-lobby"; state.ui.modal=null;
+    state.online.joiningRapida=0; queueRender();
+  } else {
+    // Guest: crear peer con ID aleatorio y conectar al host fijo
+    await new Promise((resolve,reject)=>{
+      const peer=new window.Peer(randomCode("client"),getPeerOptions());
+      runtime.peer=peer; runtime.peerKind="client";
+      peer.on("open",id=>{ state.online.peerStatus="open"; state.online.peerId=id; wirePeerEvents(peer); resolve(); });
+      peer.on("error",err=>reject(err));
+    });
+    state.online.connectionStatus="joining"; state.online.syncWarning=""; queueRender();
+    const conn=runtime.peer.connect(peerId,{reliable:true,metadata:{type:"join-request",requester:state.online.peerId}});
+    wireConnection(conn);
+    await new Promise((resolve,reject)=>{
+      let settled=false;
+      const done=h=>v=>{if(settled)return;settled=true;h(v);};
+      const res=done(resolve),rej=done(reject);
+      conn.on("open",()=>conn.send({type:"join-request",version:APP_VERSION,guestName:playerName,fromPeerId:state.online.peerId,reconnect:false}));
+      conn.on("data",msg=>{
+        if(msg.type==="join-accept"){
+          runtime.roomConnection=conn; state.online.role="guest"; state.online.connectionStatus="connected";
+          state.online.roomMeta=withNormalizedRoomMeta(msg.room); state.online.reconnectAttempts=0;
+          state.online.roomCodeInput=peerId;
+          state.screen=msg.room.status==="playing"?"game":"online-lobby";
+          state.ui.modal=null; state.online.joiningRapida=0; startHeartbeat(); queueRender(); res(msg);
+        } else if(msg.type==="join-reject"){
+          state.online.connectionStatus="rejected"; state.online.syncWarning=msg.reason||"No se pudo entrar a la sala.";
+          try{conn.close();}catch(e){} state.online.joiningRapida=0; queueRender(); rej(new Error(msg.reason||"Join rejected"));
+        }
+      });
+      conn.on("error",e=>rej(e));
+    });
+  }
+}
+
 function leaveRoomToBrowser(){
   sendRoomMessage({type:"leave",reason:"left-manually"});
   cleanupOnlineRuntime(false);
@@ -1529,6 +1625,8 @@ root.addEventListener("click", e=>{
       createMatch("bot",[state.menu.playerName||"Jugador","Mr. Saw Bot"]);
       startTurnFlow(); queueRender(); break;
     case "open-online": safeAsync(openOnlineBrowser); break;
+    case "open-salas-rapidas": state.screen="salas-rapidas"; state.online.joiningRapida=0; queueRender(); break;
+    case "join-sala-rapida": safeAsync(()=>joinSalaRapida(Number(t.dataset.sala))); break;
     case "back-menu":   leaveToMenu(); break;
     case "open-create-room": state.ui.modal="create-room"; queueRender(); break;
     case "close-modal": state.ui.modal=null; queueRender(); break;
@@ -1613,6 +1711,14 @@ function getScreenKey(){
       state.ui.notice,
       state.ui.noticeIsError?"1":"0",
       JSON.stringify(state.online.roomMeta),
+    ].join("::");
+  }
+  if(state.screen==="salas-rapidas"){
+    return [
+      state.screen,
+      state.online.joiningRapida,
+      state.ui.notice,
+      state.ui.noticeIsError?"1":"0",
     ].join("::");
   }
   return [
@@ -1742,10 +1848,11 @@ function renderTopbar(){
 
 function renderScreen(){
   switch(state.screen){
-    case "online-browser": return renderBrowser();
-    case "online-lobby":   return renderLobby();
-          case "game":           return renderGame();
-    default:               return renderMenu();
+    case "online-browser":  return renderBrowser();
+    case "online-lobby":    return renderLobby();
+    case "game":            return renderGame();
+    case "salas-rapidas":   return renderSalasRapidas();
+    default:                return renderMenu();
   }
 }
 
@@ -1780,8 +1887,41 @@ function renderMenu(){
           <button class="btn" data-action="open-online">Abrir lobby</button>
         </footer>
       </article>
+      <article class="mode-card">
+        <div class="mode-card-icon" style="background:rgba(212,175,95,0.15);font-size:22px">🚪</div>
+        <div class="eyebrow">Acceso rápido</div>
+        <h3>Salas Rápidas</h3>
+        <p>Entra a una sala numerada. El primero espera, el segundo se conecta automáticamente — sin compartir códigos.</p>
+        <footer>
+          <button class="btn" data-action="open-salas-rapidas">Ver salas</button>
+        </footer>
+      </article>
     </div>
     ${state.ui.notice?`<div class="${state.ui.noticeIsError?"err-bar":"notice-bar"}">${esc(state.ui.notice)}</div>`:""}
+  </section>`;
+}
+
+/* ── SALAS RÁPIDAS ── */
+function renderSalasRapidas(){
+  const joining=state.online.joiningRapida;
+  const salas=Array.from({length:SALA_RAPIDA_COUNT},(_,i)=>i+1);
+  return `<section class="panel salas-rapidas animate-in">
+    <div class="section-head">
+      <div class="eyebrow">Acceso rápido</div>
+      <h2>Salas Rápidas</h2>
+      <p class="muted">Entra a cualquier sala. Si estás solo, esperas. Si ya hay alguien, la partida arranca sola.</p>
+    </div>
+    ${joining?`<div class="notice-bar">Conectando a Sala ${joining}…</div>`:""}
+    ${state.ui.notice?`<div class="${state.ui.noticeIsError?"err-bar":"notice-bar"}">${esc(state.ui.notice)}</div>`:""}
+    <div class="sala-grid">
+      ${salas.map(n=>`
+        <button class="sala-card${joining===n?" sala-joining":""}" data-action="join-sala-rapida" data-sala="${n}">
+          <div class="sala-number">${n}</div>
+          <div class="sala-label">Sala ${n}</div>
+          <div class="sala-hint">${joining===n?"Conectando…":"Entra y juega"}</div>
+        </button>
+      `).join("")}
+    </div>
   </section>`;
 }
 
