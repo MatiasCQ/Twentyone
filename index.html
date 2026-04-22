@@ -636,11 +636,10 @@
       color: rgba(255,255,255,0.35);
     }
     .timer-bar {
-      height: 5px; border-radius: 999px;
+      height: 10px; border-radius: 999px;
       background: rgba(255,255,255,0.1);
       overflow: hidden;
-      flex: 1;
-      min-width: 60px;
+      width: 100%;
     }
     .timer-fill {
       height: 100%; border-radius: 999px;
@@ -650,14 +649,28 @@
     .timer-wrap {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      min-width: 80px;
+      gap: 8px;
+      min-width: 220px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(212,175,95,0.35);
+      background: rgba(212,175,95,0.1);
+      box-shadow: 0 0 24px rgba(212,175,95,0.2);
     }
     .timer-label-row {
       display: flex;
       justify-content: space-between;
-      font-size: 11px;
-      color: rgba(255,255,255,0.4);
+      align-items: baseline;
+      font-size: 13px;
+      color: rgba(255,255,255,0.75);
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    .timer-seconds {
+      font-family: var(--font-head);
+      font-size: 24px;
+      color: var(--gold2);
+      line-height: 1;
     }
 
     /* ── TRUMP MODAL ────────────────── */
@@ -2233,12 +2246,11 @@ function renderTableCenter(target,timerPct,game){
       </div>
     </div>
     <div class="table-metrics">
-      <div class="tmetric"><div class="tmetric-val">${target}</div><div class="tmetric-lbl">Objetivo</div></div>
       <div class="tmetric"><div class="tmetric-val">${game.roundNumber}</div><div class="tmetric-lbl">Ronda</div></div>
       <div class="tmetric"><div class="tmetric-val">${game.deck.length}</div><div class="tmetric-lbl">Mazo</div></div>
     </div>
     <div class="timer-wrap">
-      <div class="timer-label-row"><span>⏱ Tiempo</span><span data-ui="timer-label">${Math.ceil(getTimeLeftMs()/1000)}s</span></div>
+      <div class="timer-label-row"><span>⏱ Tiempo restante</span><span class="timer-seconds" data-ui="timer-label">${Math.ceil(getTimeLeftMs()/1000)}s</span></div>
       <div class="timer-bar"><div class="timer-fill" data-ui="timer-fill" style="width:${timerPct}%"></div></div>
     </div>
   </div>`;
